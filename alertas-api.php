@@ -46,11 +46,17 @@ function initTarefas(PDO $pdo): void {
             atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             concluido_em DATETIME NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_tarefas_status ON tarefas_sistema(status);
-        CREATE INDEX IF NOT EXISTS idx_tarefas_user ON tarefas_sistema(responsavel_user_id,status);
-        CREATE INDEX IF NOT EXISTS idx_tarefas_role ON tarefas_sistema(responsavel_role,status);
-        CREATE INDEX IF NOT EXISTS idx_tarefas_limite ON tarefas_sistema(data_limite,status);
     ");
+    foreach ([
+        'idx_tarefas_status' => 'status',
+        'idx_tarefas_user' => 'responsavel_user_id,status',
+        'idx_tarefas_role' => 'responsavel_role,status',
+        'idx_tarefas_limite' => 'data_limite,status'
+    ] as $indice => $colunas) {
+        if (!indiceExiste($pdo, $indice)) {
+            $pdo->exec("CREATE INDEX {$indice} ON tarefas_sistema({$colunas})");
+        }
+    }
 }
 function upsertAuto(
     PDO $pdo,string $key,string $origem,string $tipo,string $titulo,string $descricao,
