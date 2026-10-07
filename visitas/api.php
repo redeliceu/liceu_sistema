@@ -42,8 +42,8 @@ function sincronizarPrimeiraMensalidadeSponteArena(PDO $pdo): void {
                              WHERE aluno_id=? AND LOWER(TRIM(COALESCE(categoria,'')))='mensalidade'
                                AND date(data_pagamento)>=date(?)");
         $up=$pdo->prepare("INSERT INTO controle_qualidade_contratos
-            (visita_id,primeira_mensalidade_status,primeira_mensalidade_pago_em,primeira_mensalidade_atualizado_por,primeira_mensalidade_atualizado_em)
-            VALUES(?,'pago',?,NULL,CURRENT_TIMESTAMP)
+            (visita_id,checklist_json,observacoes,primeira_mensalidade_status,primeira_mensalidade_pago_em,primeira_mensalidade_atualizado_por,primeira_mensalidade_atualizado_em)
+            VALUES(?,'{}','', 'pago',?,NULL,CURRENT_TIMESTAMP)
             ON DUPLICATE KEY UPDATE
               primeira_mensalidade_status='pago',
               primeira_mensalidade_pago_em=CASE
@@ -540,19 +540,19 @@ function initVisitas(PDO $pdo): void {
 
         CREATE TABLE IF NOT EXISTS visitas (
             id INTEGER PRIMARY KEY,
-            data TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Aguardando Atendimento',
+            data VARCHAR(10) NOT NULL,
+            status VARCHAR(80) NOT NULL DEFAULT 'Aguardando Atendimento',
             vendedor_id INTEGER NULL,
             curso_id INTEGER NULL,
             nome TEXT NOT NULL,
             telefone TEXT NULL,
             documento TEXT NULL,
             observacoes TEXT NULL,
-            protocolo TEXT NULL,
-            central_appointment_id TEXT NULL,
-            central_contact_id TEXT NULL,
-            central_campaign_id TEXT NULL,
-            central_visit_external_id TEXT NULL,
+            protocolo VARCHAR(191) NULL,
+            central_appointment_id VARCHAR(191) NULL,
+            central_contact_id VARCHAR(191) NULL,
+            central_campaign_id VARCHAR(191) NULL,
+            central_visit_external_id VARCHAR(191) NULL,
             dados_json TEXT NOT NULL,
             aluno_id INTEGER NULL,
             agenda_id INTEGER NULL,
@@ -567,28 +567,28 @@ function initVisitas(PDO $pdo): void {
 
         CREATE TABLE IF NOT EXISTS painel_vendas_curtidas (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            tipo TEXT NOT NULL CHECK(tipo IN ('venda','vendedor')),
-            alvo TEXT NOT NULL,
+            tipo VARCHAR(20) NOT NULL CHECK(tipo IN ('venda','vendedor')),
+            alvo VARCHAR(150) NOT NULL,
             usuario_id INTEGER NOT NULL,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(tipo,alvo,usuario_id)
         );
         CREATE INDEX IF NOT EXISTS idx_painel_curtidas_alvo
             ON painel_vendas_curtidas(tipo,alvo);
 
         CREATE TABLE IF NOT EXISTS painel_vendas_config (
-            chave TEXT PRIMARY KEY,
+            chave VARCHAR(191) PRIMARY KEY,
             valor TEXT NOT NULL,
-            atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         INSERT IGNORE INTO painel_vendas_config(chave,valor) VALUES('meta_equipe_mensal','500');
 
         CREATE TABLE IF NOT EXISTS painel_vendas_mensagens (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            tipo TEXT NOT NULL DEFAULT 'incentivo',
+            tipo VARCHAR(30) NOT NULL DEFAULT 'incentivo',
             mensagem TEXT NOT NULL,
             autor_usuario_id INTEGER,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             ativo INTEGER NOT NULL DEFAULT 1
         );
         CREATE INDEX IF NOT EXISTS idx_painel_mensagens_ativo
@@ -599,14 +599,14 @@ function initVisitas(PDO $pdo): void {
 
         CREATE TABLE IF NOT EXISTS arena_usuarios (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            usuario TEXT NOT NULL UNIQUE,
+            usuario VARCHAR(191) NOT NULL UNIQUE,
             senha_hash TEXT NOT NULL,
             nome TEXT NOT NULL,
-            perfil TEXT NOT NULL DEFAULT 'vendedor' CHECK(perfil IN ('diretoria','gestor','vendedor')),
+            perfil VARCHAR(24) NOT NULL DEFAULT 'vendedor' CHECK(perfil IN ('diretoria','gestor','vendedor')),
             vendedor_id INTEGER,
             foto TEXT,
             ativo INTEGER NOT NULL DEFAULT 1,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS arena_eventos (
@@ -618,7 +618,7 @@ function initVisitas(PDO $pdo): void {
             titulo TEXT NOT NULL,
             descricao TEXT,
             dados_json TEXT,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_arena_eventos_data ON arena_eventos(criado_em);
         CREATE INDEX IF NOT EXISTS idx_arena_eventos_vendedor ON arena_eventos(vendedor_id);
@@ -627,8 +627,8 @@ function initVisitas(PDO $pdo): void {
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             evento_id INTEGER NOT NULL,
             arena_usuario_id INTEGER NOT NULL,
-            reacao TEXT NOT NULL DEFAULT 'curtir',
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            reacao VARCHAR(20) NOT NULL DEFAULT 'curtir',
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(evento_id,arena_usuario_id,reacao)
         );
 
@@ -637,7 +637,7 @@ function initVisitas(PDO $pdo): void {
             evento_id INTEGER NOT NULL,
             arena_usuario_id INTEGER NOT NULL,
             texto TEXT NOT NULL,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_arena_comentarios_evento ON arena_comentarios(evento_id,id);
 
@@ -646,7 +646,7 @@ function initVisitas(PDO $pdo): void {
             de_usuario_id INTEGER NOT NULL,
             vendedor_id INTEGER NOT NULL,
             mensagem TEXT NOT NULL,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS arena_desafios (
@@ -656,10 +656,10 @@ function initVisitas(PDO $pdo): void {
             desafiado_vendedor_id INTEGER NOT NULL,
             tipo TEXT NOT NULL,
             titulo TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pendente' CHECK(status IN ('pendente','aceito','recusado','encerrado')),
-            data_desafio TEXT NOT NULL,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            respondido_em TEXT
+            status VARCHAR(24) NOT NULL DEFAULT 'pendente' CHECK(status IN ('pendente','aceito','recusado','encerrado')),
+            data_desafio VARCHAR(10) NOT NULL,
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            respondido_em DATETIME NULL
         );
         CREATE INDEX IF NOT EXISTS idx_arena_desafios_data ON arena_desafios(data_desafio,status);
 
@@ -670,19 +670,19 @@ function initVisitas(PDO $pdo): void {
             vendedor_id INTEGER NOT NULL,
             tipo TEXT NOT NULL,
             fichas INTEGER NOT NULL,
-            data_ref TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'ativa',
-            criada_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            resolvida_em TEXT NULL
+            data_ref VARCHAR(10) NOT NULL,
+            status VARCHAR(24) NOT NULL DEFAULT 'ativa',
+            criada_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            resolvida_em DATETIME NULL
         );
         CREATE INDEX IF NOT EXISTS idx_arena_apostas_data ON arena_apostas(data_ref,status);
         CREATE INDEX IF NOT EXISTS idx_arena_apostas_vendedor ON arena_apostas(vendedor_id,data_ref);
 
         CREATE TABLE IF NOT EXISTS arena_destaques_diarios (
-            data_ref TEXT PRIMARY KEY,
+            data_ref VARCHAR(10) PRIMARY KEY,
             vendedor_id INTEGER NOT NULL,
             evento_id INTEGER NULL,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS visita_matriculas (
@@ -700,7 +700,7 @@ function initVisitas(PDO $pdo): void {
             valor_parcela REAL NULL,
             valor_pontualidade REAL NULL,
             central_enrollment_external_id TEXT NULL,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(visita_id, matricula_id)
         );
 
@@ -721,8 +721,8 @@ function initVisitas(PDO $pdo): void {
             valor_parcela REAL NULL,
             valor_pontualidade REAL NULL,
             central_enrollment_external_id TEXT NULL,
-            status TEXT NOT NULL DEFAULT 'pendente_alocacao',
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            status VARCHAR(32) NOT NULL DEFAULT 'pendente_alocacao',
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE INDEX IF NOT EXISTS idx_vm_pend_visita ON visita_matriculas_pendentes(visita_id);
@@ -730,12 +730,12 @@ function initVisitas(PDO $pdo): void {
 
         CREATE TABLE IF NOT EXISTS controle_qualidade_contratos (
             visita_id INTEGER PRIMARY KEY,
-            status TEXT NOT NULL DEFAULT 'nao_revisado'
+            status VARCHAR(24) NOT NULL DEFAULT 'nao_revisado'
                 CHECK(status IN ('nao_revisado','pendente','aprovado','correcao')),
-            checklist_json TEXT NOT NULL DEFAULT '{}',
-            observacoes TEXT NOT NULL DEFAULT '',
+            checklist_json TEXT NOT NULL,
+            observacoes TEXT NOT NULL,
             atualizado_por INTEGER NULL,
-            atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_cq_status ON controle_qualidade_contratos(status);
 
@@ -748,10 +748,10 @@ function initVisitas(PDO $pdo): void {
         CREATE TABLE IF NOT EXISTS roleta_giros (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             vendedor_id INTEGER NOT NULL,
-            data_ref TEXT NOT NULL,
+            data_ref VARCHAR(10) NOT NULL,
             premio_id INTEGER NOT NULL,
             premio_nome TEXT NOT NULL,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(vendedor_id, data_ref)
         );
 
@@ -759,9 +759,9 @@ function initVisitas(PDO $pdo): void {
 
         CREATE TABLE IF NOT EXISTS acompanhamento_vendedor (
             vendedor_id INTEGER NOT NULL,
-            competencia TEXT NOT NULL,
-            feedback TEXT NOT NULL DEFAULT '',
-            atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            competencia VARCHAR(7) NOT NULL,
+            feedback TEXT NOT NULL,
+            atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY(vendedor_id, competencia)
         );
 
@@ -797,10 +797,10 @@ function initVisitas(PDO $pdo): void {
     ");
 
     if (!colunaExiste($pdo, 'visitas', 'atendimento_iniciado_em')) {
-        $pdo->exec("ALTER TABLE visitas ADD COLUMN atendimento_iniciado_em TEXT NULL");
+        $pdo->exec("ALTER TABLE visitas ADD COLUMN atendimento_iniciado_em DATETIME NULL");
     }
     if (!colunaExiste($pdo, 'visitas', 'atendimento_finalizado_em')) {
-        $pdo->exec("ALTER TABLE visitas ADD COLUMN atendimento_finalizado_em TEXT NULL");
+        $pdo->exec("ALTER TABLE visitas ADD COLUMN atendimento_finalizado_em DATETIME NULL");
     }
     if (!colunaExiste($pdo, 'visitas', 'atendimento_resultado')) {
         $pdo->exec("ALTER TABLE visitas ADD COLUMN atendimento_resultado TEXT NULL");
@@ -808,20 +808,20 @@ function initVisitas(PDO $pdo): void {
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_visitas_atendimento_fila ON visitas(vendedor_id,status,atendimento_finalizado_em)");
 
     if (!colunaExiste($pdo, 'visitas', 'protocolo')) {
-        $pdo->exec("ALTER TABLE visitas ADD COLUMN protocolo TEXT NULL");
+        $pdo->exec("ALTER TABLE visitas ADD COLUMN protocolo VARCHAR(191) NULL");
     }
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_visitas_protocolo ON visitas(protocolo)");
     if (!colunaExiste($pdo, 'visitas', 'central_appointment_id')) {
-        $pdo->exec("ALTER TABLE visitas ADD COLUMN central_appointment_id TEXT NULL");
+        $pdo->exec("ALTER TABLE visitas ADD COLUMN central_appointment_id VARCHAR(191) NULL");
     }
     if (!colunaExiste($pdo, 'visitas', 'central_contact_id')) {
-        $pdo->exec("ALTER TABLE visitas ADD COLUMN central_contact_id TEXT NULL");
+        $pdo->exec("ALTER TABLE visitas ADD COLUMN central_contact_id VARCHAR(191) NULL");
     }
     if (!colunaExiste($pdo, 'visitas', 'central_campaign_id')) {
-        $pdo->exec("ALTER TABLE visitas ADD COLUMN central_campaign_id TEXT NULL");
+        $pdo->exec("ALTER TABLE visitas ADD COLUMN central_campaign_id VARCHAR(191) NULL");
     }
     if (!colunaExiste($pdo, 'visitas', 'central_visit_external_id')) {
-        $pdo->exec("ALTER TABLE visitas ADD COLUMN central_visit_external_id TEXT NULL");
+        $pdo->exec("ALTER TABLE visitas ADD COLUMN central_visit_external_id VARCHAR(191) NULL");
     }
     if (!indiceExiste($pdo, 'idx_visitas_central_appointment')) $pdo->exec("CREATE UNIQUE INDEX idx_visitas_central_appointment ON visitas(central_appointment_id)");
     if (!indiceExiste($pdo, 'idx_visitas_central_visit_external')) $pdo->exec("CREATE UNIQUE INDEX idx_visitas_central_visit_external ON visitas(central_visit_external_id)");
@@ -850,14 +850,14 @@ function initVisitas(PDO $pdo): void {
     // V3.8.2: a primeira mensalidade é uma condição independente da taxa de matrícula.
     // Campos aditivos: nenhum dado existente é apagado ou reconstruído.
     foreach ([
-        'financeiro_status' => "TEXT NOT NULL DEFAULT 'pendente'",
-        'financeiro_observacoes' => "TEXT NOT NULL DEFAULT ''",
+        'financeiro_status' => "VARCHAR(24) NOT NULL DEFAULT 'pendente'",
+        'financeiro_observacoes' => "TEXT NULL",
         'financeiro_atualizado_por' => "INTEGER NULL",
-        'financeiro_atualizado_em' => "TEXT NULL",
-        'primeira_mensalidade_status' => "TEXT NOT NULL DEFAULT 'aguardando'",
-        'primeira_mensalidade_pago_em' => "TEXT NULL",
+        'financeiro_atualizado_em' => "DATETIME NULL",
+        'primeira_mensalidade_status' => "VARCHAR(24) NOT NULL DEFAULT 'aguardando'",
+        'primeira_mensalidade_pago_em' => "VARCHAR(10) NULL",
         'primeira_mensalidade_atualizado_por' => "INTEGER NULL",
-        'primeira_mensalidade_atualizado_em' => "TEXT NULL"
+        'primeira_mensalidade_atualizado_em' => "DATETIME NULL"
     ] as $col => $def) {
         if (!colunaExiste($pdo, 'controle_qualidade_contratos', $col)) {
             $pdo->exec("ALTER TABLE controle_qualidade_contratos ADD COLUMN {$col} {$def}");
@@ -928,9 +928,9 @@ function initVisitas(PDO $pdo): void {
 
     foreach (['visita_matriculas','visita_matriculas_pendentes'] as $tbTaxa) {
         foreach ([
-            'taxa_status' => "TEXT NOT NULL DEFAULT 'pendente'",
-            'taxa_vencimento' => "TEXT NULL",
-            'taxa_pago_em' => "TEXT NULL"
+            'taxa_status' => "VARCHAR(24) NOT NULL DEFAULT 'pendente'",
+            'taxa_vencimento' => "VARCHAR(10) NULL",
+            'taxa_pago_em' => "VARCHAR(10) NULL"
         ] as $col => $def) {
             if (!colunaExiste($pdo, $tbTaxa, $col)) {
                 $pdo->exec("ALTER TABLE {$tbTaxa} ADD COLUMN {$col} {$def}");
@@ -943,8 +943,8 @@ function initVisitas(PDO $pdo): void {
         'origem_id' => "TEXT NULL",
         'vendedor_id' => "INTEGER NULL",
         'tipo_ingresso' => "TEXT NULL",
-        'status_participacao' => "TEXT NOT NULL DEFAULT 'ativo'",
-        'data_inicio_participacao' => "TEXT NULL",
+        'status_participacao' => "VARCHAR(24) NOT NULL DEFAULT 'ativo'",
+        'data_inicio_participacao' => "VARCHAR(10) NULL",
         'modulo_ingresso_id' => "INTEGER NULL"
     ] as $col => $def) {
         if (!colunaExiste($pdo, 'matriculas', $col)) {
@@ -3617,7 +3617,7 @@ authInit($pdo);
         if(!$q->fetchColumn()) out(['ok'=>false,'error'=>'Matrícula paga não encontrada.'],404);
         $status=$correto?'aprovado':'correcao';
         if(!$correto && $obs==='') out(['ok'=>false,'error'=>'Quando o contrato no Sponte não estiver correto, descreva a pendência para o vendedor.'],422);
-        $stmt=$pdo->prepare("INSERT INTO controle_qualidade_contratos(visita_id,financeiro_status,financeiro_observacoes,financeiro_atualizado_por,financeiro_atualizado_em) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE financeiro_status=VALUES(financeiro_status),financeiro_observacoes=VALUES(financeiro_observacoes),financeiro_atualizado_por=VALUES(financeiro_atualizado_por),financeiro_atualizado_em=CURRENT_TIMESTAMP");
+        $stmt=$pdo->prepare("INSERT INTO controle_qualidade_contratos(visita_id,checklist_json,observacoes,financeiro_status,financeiro_observacoes,financeiro_atualizado_por,financeiro_atualizado_em) VALUES(?,'{}','',?,?,?,CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE financeiro_status=VALUES(financeiro_status),financeiro_observacoes=VALUES(financeiro_observacoes),financeiro_atualizado_por=VALUES(financeiro_atualizado_por),financeiro_atualizado_em=CURRENT_TIMESTAMP");
         $stmt->execute([$visitaId,$status,$obs,(int)$u['id']]);
         out(['ok'=>true,'status'=>$status,'message'=>$correto?'Validação financeira concluída.':'Pendência financeira devolvida ao vendedor.']);
     }
@@ -5979,7 +5979,7 @@ authInit($pdo);
         if(!in_array($status,['aguardando','pago','nao_pago'],true))out(['ok'=>false,'error'=>'Status da primeira mensalidade inválido.'],422);
         if($status==='pago'&&!preg_match('/^\d{4}-\d{2}-\d{2}$/',$pagoEm))out(['ok'=>false,'error'=>'Informe a data em que a primeira mensalidade foi paga.'],422);
         if($status!=='pago')$pagoEm='';
-        $stmt=$pdo->prepare("INSERT INTO controle_qualidade_contratos(visita_id,primeira_mensalidade_status,primeira_mensalidade_pago_em,primeira_mensalidade_atualizado_por,primeira_mensalidade_atualizado_em) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE primeira_mensalidade_status=VALUES(primeira_mensalidade_status),primeira_mensalidade_pago_em=VALUES(primeira_mensalidade_pago_em),primeira_mensalidade_atualizado_por=VALUES(primeira_mensalidade_atualizado_por),primeira_mensalidade_atualizado_em=CURRENT_TIMESTAMP");
+        $stmt=$pdo->prepare("INSERT INTO controle_qualidade_contratos(visita_id,checklist_json,observacoes,primeira_mensalidade_status,primeira_mensalidade_pago_em,primeira_mensalidade_atualizado_por,primeira_mensalidade_atualizado_em) VALUES(?,'{}','',?,?,?,CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE primeira_mensalidade_status=VALUES(primeira_mensalidade_status),primeira_mensalidade_pago_em=VALUES(primeira_mensalidade_pago_em),primeira_mensalidade_atualizado_por=VALUES(primeira_mensalidade_atualizado_por),primeira_mensalidade_atualizado_em=CURRENT_TIMESTAMP");
         $stmt->execute([$visitaId,$status,$pagoEm!==''?$pagoEm:null,authUserId()]);
         out(['ok'=>true,'message'=>$status==='pago'?'Primeira mensalidade registrada como paga.':'Situação da primeira mensalidade atualizada.']);
     }

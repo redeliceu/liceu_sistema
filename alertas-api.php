@@ -25,26 +25,26 @@ function initTarefas(PDO $pdo): void {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS tarefas_sistema(
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            chave_unica TEXT NULL UNIQUE,
-            origem TEXT NOT NULL DEFAULT 'manual',
-            tipo TEXT NOT NULL DEFAULT 'tarefa',
+            chave_unica VARCHAR(191) NULL UNIQUE,
+            origem VARCHAR(40) NOT NULL DEFAULT 'manual',
+            tipo VARCHAR(60) NOT NULL DEFAULT 'tarefa',
             titulo TEXT NOT NULL,
-            descricao TEXT NOT NULL DEFAULT '',
-            prioridade TEXT NOT NULL DEFAULT 'normal'
+            descricao TEXT NOT NULL,
+            prioridade VARCHAR(16) NOT NULL DEFAULT 'normal'
                 CHECK(prioridade IN ('baixa','normal','alta','urgente')),
-            status TEXT NOT NULL DEFAULT 'pendente'
+            status VARCHAR(16) NOT NULL DEFAULT 'pendente'
                 CHECK(status IN ('pendente','andamento','concluida','ignorada')),
             responsavel_user_id INTEGER NULL,
-            responsavel_role TEXT NULL,
-            data_limite TEXT NULL,
-            entidade_tipo TEXT NULL,
-            entidade_id TEXT NULL,
+            responsavel_role VARCHAR(40) NULL,
+            data_limite VARCHAR(10) NULL,
+            entidade_tipo VARCHAR(50) NULL,
+            entidade_id VARCHAR(191) NULL,
             link TEXT NULL,
             automatica INTEGER NOT NULL DEFAULT 0,
             criado_por INTEGER NULL,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            concluido_em TEXT NULL
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            concluido_em DATETIME NULL
         );
         CREATE INDEX IF NOT EXISTS idx_tarefas_status ON tarefas_sistema(status);
         CREATE INDEX IF NOT EXISTS idx_tarefas_user ON tarefas_sistema(responsavel_user_id,status);
