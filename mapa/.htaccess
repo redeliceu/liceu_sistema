@@ -1,0 +1,9 @@
+DirectoryIndex index.php
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^dados(?:/|$) - [F,L,NC]
+RewriteRule ^(?:config|central-config)\.php$ - [F,L,NC]
+RewriteRule \.(?:sqlite|sqlite3|db|bak|backup|sql|log|ini|env|zip|tar|gz|7z|md|txt)$ - [F,L,NC]
+</IfModule>

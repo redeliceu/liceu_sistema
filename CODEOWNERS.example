@@ -1,0 +1,11 @@
+# Renomeie para .github/CODEOWNERS no repositório.
+# Substitua @SEU_USUARIO pelo proprietário técnico.
+* @SEU_USUARIO
+/private-config.example.php @SEU_USUARIO
+/auth.php @SEU_USUARIO
+/auth-api.php @SEU_USUARIO
+/security.php @SEU_USUARIO
+/session-security.php @SEU_USUARIO
+/mapa/api.php @SEU_USUARIO
+/visitas/api.php @SEU_USUARIO
+/api/ @SEU_USUARIO
