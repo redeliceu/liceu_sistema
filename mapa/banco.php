@@ -162,7 +162,7 @@ function garantirPagamentosSponte(PDO $pdo): void
                 vinculados INTEGER NOT NULL DEFAULT 0,
                 nao_vinculados INTEGER NOT NULL DEFAULT 0,
                 duplicados INTEGER NOT NULL DEFAULT 0,
-                importado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                importado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         ");
     }
@@ -178,7 +178,7 @@ function garantirInteligenciaFinanceiraSponte(PDO $pdo): void
     }
 
     // Histórico operacional dos cancelamentos detectados no XML.
-    $pdo->exec("\n        CREATE TABLE IF NOT EXISTS sponte_cancelamentos (\n            id BIGINT AUTO_INCREMENT PRIMARY KEY,\n            lancamento_id INTEGER NOT NULL UNIQUE,\n            aluno_id INTEGER NULL,\n            matricula_id INTEGER NULL,\n            nome_sponte TEXT NOT NULL,\n            contrato TEXT NULL,\n            turma_sponte TEXT NULL,\n            data_cancelamento TEXT NOT NULL,\n            valor REAL NOT NULL DEFAULT 0,\n            motivo TEXT NULL,\n            complemento TEXT NULL,\n            status_vinculo TEXT NOT NULL DEFAULT 'pendente',\n            metodo_vinculo TEXT NULL,\n            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em TEXT NULL,\n            FOREIGN KEY (aluno_id) REFERENCES alunos(id) ON DELETE SET NULL,\n            FOREIGN KEY (matricula_id) REFERENCES matriculas(id) ON DELETE SET NULL\n        )\n    ");
+    $pdo->exec("\n        CREATE TABLE IF NOT EXISTS sponte_cancelamentos (\n            id BIGINT AUTO_INCREMENT PRIMARY KEY,\n            lancamento_id INTEGER NOT NULL UNIQUE,\n            aluno_id INTEGER NULL,\n            matricula_id INTEGER NULL,\n            nome_sponte TEXT NOT NULL,\n            contrato TEXT NULL,\n            turma_sponte TEXT NULL,\n            data_cancelamento TEXT NOT NULL,\n            valor REAL NOT NULL DEFAULT 0,\n            motivo TEXT NULL,\n            complemento TEXT NULL,\n            status_vinculo VARCHAR(32) NOT NULL DEFAULT 'pendente',\n            metodo_vinculo TEXT NULL,\n            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em TEXT NULL,\n            FOREIGN KEY (aluno_id) REFERENCES alunos(id) ON DELETE SET NULL,\n            FOREIGN KEY (matricula_id) REFERENCES matriculas(id) ON DELETE SET NULL\n        )\n    ");
     if (!indiceExiste($pdo,'idx_sponte_cancel_aluno')) $pdo->exec("CREATE INDEX idx_sponte_cancel_aluno ON sponte_cancelamentos(aluno_id)");
     if (!indiceExiste($pdo,'idx_sponte_cancel_matricula')) $pdo->exec("CREATE INDEX idx_sponte_cancel_matricula ON sponte_cancelamentos(matricula_id)");
     if (!indiceExiste($pdo,'idx_sponte_cancel_status')) $pdo->exec("CREATE INDEX idx_sponte_cancel_status ON sponte_cancelamentos(status_vinculo)");
@@ -211,11 +211,11 @@ function garantirInadimplenciaSponte(PDO $pdo): void
                 aluno_id INTEGER NULL,
                 nome_sponte TEXT NOT NULL,
                 nome_normalizado TEXT NOT NULL,
-                meses_json TEXT NOT NULL DEFAULT '{}',
+                meses_json VARCHAR(2048) NOT NULL DEFAULT '{}',
                 meses_inadimplencia INTEGER NOT NULL DEFAULT 0,
                 total_aberto REAL NOT NULL DEFAULT 0,
-                metodo_vinculo TEXT NOT NULL DEFAULT 'nao_vinculado',
-                criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                metodo_vinculo VARCHAR(128) NOT NULL DEFAULT 'nao_vinculado',
+                criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(importacao_id, nro_matricula),
                 FOREIGN KEY (importacao_id) REFERENCES sponte_inadimplencia_importacoes(id) ON DELETE CASCADE,
                 FOREIGN KEY (aluno_id) REFERENCES alunos(id) ON DELETE SET NULL
@@ -396,7 +396,7 @@ function garantirModulosPorAgenda(PDO $pdo): void
             aulas_previstas INTEGER NOT NULL DEFAULT 1 CHECK(aulas_previstas >= 1),
             data_inicio TEXT NULL,
             legacy_turma_modulo_id INTEGER NULL,
-            criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(agenda_id, ordem),
             FOREIGN KEY (agenda_id) REFERENCES agenda(id)
                 ON UPDATE CASCADE ON DELETE CASCADE
