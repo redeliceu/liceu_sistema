@@ -4208,6 +4208,7 @@ function applyAdminUI() {
                 <div class="turma-actions-menu" onclick="event.stopPropagation()">
                   <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openVincularAluno(${turmaId}, ${agendaId})"><span class="menu-ico">＋</span><span>Vincular aluno</span></button>
                   <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openModulosModal(${turmaId}, ${agendaId})"><span class="menu-ico">▤</span><span>Módulos desta turma</span></button>
+                  <button class="turma-actions-item" type="button" onclick="closeTurmaActions();abrirRelatorioTurma()"><span class="menu-ico">▧</span><span>Relatório da turma</span></button>
                   <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openAgendaModal('${esc(dia)}','${esc(horario)}','${esc(salaId)}')"><span class="menu-ico">✎</span><span>Editar turma</span></button>
                   <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openMigrarTurmaSala(${turmaId}, '${esc(dia)}', '${esc(horario)}', '${esc(salaId)}')"><span class="menu-ico">⇄</span><span>Migrar sala</span></button>
                   <div class="turma-actions-divider"></div>
@@ -4297,6 +4298,45 @@ function applyAdminUI() {
     } catch(err) {
       toast(err.message);
     }
+  }
+
+  function abrirRelatorioTurma(){
+    const c=turmaDetalhesContext;
+    if(!c){ toast('Abra uma turma antes de gerar o relatório.'); return; }
+    const turma=db.turmas.find(t=>Number(t.id)===Number(c.turmaId));
+    const sala=db.salas.find(s=>String(s.id)===String(c.salaId));
+    const prof=turma ? db.professores.find(p=>Number(p.id)===Number(turma.profId)) : null;
+    const alunos=Array.isArray(c.alunos)?c.alunos:[];
+    const ativos=alunos.filter(a=>a.matriculaStatus==='ativo');
+    const iniciaram=ativos.filter(a=>a.ultimaPresenca).length;
+    const naoIniciaram=ativos.filter(a=>!a.ultimaPresenca && a.statusParticipacao!=='aguardando_inicio').length;
+    const aguardando=ativos.filter(a=>a.statusParticipacao==='aguardando_inicio').length;
+    const desaparecidos=ativos.filter(a=>a.status==='desaparecido').length;
+    const dataGeracao=new Date().toLocaleString('pt-BR');
+    const statusTexto=(a)=>{
+      if(a.matriculaStatus==='transferido') return a.turmaDestinoNome?`Migrado para ${a.turmaDestinoNome}`:'Migrado';
+      if(a.matriculaStatus==='formado') return 'Formado';
+      if(a.matriculaStatus==='cancelado') return 'Cancelado';
+      if(a.statusParticipacao==='aguardando_inicio') return 'Aguardando início';
+      const mapa={ativo:'Ativo',nao_iniciado:'Não iniciou',desaparecido:'Desaparecido',bloqueado:'Bloqueado',reprovado:'Reprovado'};
+      return mapa[a.status]||String(a.status||'—');
+    };
+    const linhas=alunos.map((a,i)=>`<tr>
+      <td>${i+1}</td><td><strong>${esc(a.nome)}</strong></td><td>${esc(statusTexto(a))}</td>
+      <td>${a.ultimaPresenca?formatarDataBr(a.ultimaPresenca):'—'}</td>
+      <td>${esc(a.telefone||'—')}</td>
+    </tr>`).join('');
+    const w=window.open('','_blank');
+    if(!w){ toast('O navegador bloqueou a janela do relatório. Libere pop-ups e tente novamente.'); return; }
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório da turma • ${esc(turma?.nome||'Turma')}</title><style>
+      *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#172033;margin:0;background:#f5f7fb}.page{max-width:1100px;margin:24px auto;background:#fff;padding:30px;border-radius:14px}.head{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #18233a;padding-bottom:18px;margin-bottom:18px}.head h1{margin:0 0 6px;font-size:25px}.muted{color:#667085;font-size:13px}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:18px 0}.kpi{border:1px solid #e3e7ef;border-radius:10px;padding:12px}.kpi strong{display:block;font-size:22px}.kpi span{font-size:11px;color:#667085;text-transform:uppercase;font-weight:700}.meta{padding:12px 14px;background:#f6f8fc;border-radius:10px;line-height:1.7;margin-bottom:18px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#18233a;color:#fff;text-align:left;padding:10px}td{padding:10px;border-bottom:1px solid #e7eaf0}tr:nth-child(even) td{background:#fafbfc}.actions{margin:0 auto 14px;max-width:1100px;display:flex;justify-content:flex-end;gap:8px}.actions button{border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700}.print{background:#18233a;color:#fff}.close{background:#e9edf4;color:#172033}@media print{body{background:#fff}.page{margin:0;max-width:none;padding:12px;border-radius:0}.actions{display:none}thead{display:table-header-group}tr{break-inside:avoid}.kpis{grid-template-columns:repeat(5,1fr)}}
+    </style></head><body><div class="actions"><button class="close" onclick="window.close()">Fechar</button><button class="print" onclick="window.print()">Imprimir / Salvar PDF</button></div><div class="page">
+      <div class="head"><div><h1>Relatório da Turma</h1><div class="muted">Liceu Brasil • gerado em ${dataGeracao}</div></div><div style="text-align:right"><strong>${esc(turma?.nome||'Turma')}</strong><div class="muted">${esc(c.dia||'')} • ${esc(c.horario||'')}</div></div></div>
+      <div class="meta"><strong>Professor:</strong> ${esc(prof?.nome||'—')} &nbsp; • &nbsp; <strong>Sala:</strong> ${esc(sala?.nome||'—')} &nbsp; • &nbsp; <strong>Dia/horário:</strong> ${esc(c.dia||'—')} • ${esc(c.horario||'—')}</div>
+      <div class="kpis"><div class="kpi"><strong>${ativos.length}</strong><span>matriculados ativos</span></div><div class="kpi"><strong>${iniciaram}</strong><span>já iniciaram</span></div><div class="kpi"><strong>${naoIniciaram}</strong><span>não iniciaram</span></div><div class="kpi"><strong>${aguardando}</strong><span>aguardando início</span></div><div class="kpi"><strong>${desaparecidos}</strong><span>desaparecidos</span></div></div>
+      <table><thead><tr><th>#</th><th>Aluno</th><th>Situação</th><th>Última presença</th><th>Telefone</th></tr></thead><tbody>${linhas||'<tr><td colspan="5">Nenhum aluno nesta turma.</td></tr>'}</tbody></table>
+    </div></body></html>`);
+    w.document.close(); w.focus();
   }
 
   function alunoContextoPorMatricula(matriculaId){
