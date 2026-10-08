@@ -573,6 +573,9 @@ function initVisitas(PDO $pdo): void {
             criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(tipo,alvo,usuario_id)
         );
+        CREATE INDEX IF NOT EXISTS idx_painel_curtidas_alvo
+            ON painel_vendas_curtidas(tipo,alvo);
+
         CREATE TABLE IF NOT EXISTS painel_vendas_config (
             chave VARCHAR(191) PRIMARY KEY,
             valor TEXT NOT NULL,
