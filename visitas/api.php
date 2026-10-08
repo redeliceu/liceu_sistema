@@ -561,10 +561,6 @@ function initVisitas(PDO $pdo): void {
             finalizado_em TEXT NULL
         );
 
-        CREATE INDEX IF NOT EXISTS idx_visitas_data ON visitas(data);
-        CREATE INDEX IF NOT EXISTS idx_visitas_status ON visitas(status);
-        CREATE INDEX IF NOT EXISTS idx_visitas_vendedor ON visitas(vendedor_id);
-
         CREATE TABLE IF NOT EXISTS painel_vendas_curtidas (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             tipo VARCHAR(20) NOT NULL CHECK(tipo IN ('venda','vendedor')),
@@ -573,9 +569,6 @@ function initVisitas(PDO $pdo): void {
             criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(tipo,alvo,usuario_id)
         );
-        CREATE INDEX IF NOT EXISTS idx_painel_curtidas_alvo
-            ON painel_vendas_curtidas(tipo,alvo);
-
         CREATE TABLE IF NOT EXISTS painel_vendas_config (
             chave VARCHAR(191) PRIMARY KEY,
             valor TEXT NOT NULL,
@@ -591,9 +584,6 @@ function initVisitas(PDO $pdo): void {
             criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             ativo INTEGER NOT NULL DEFAULT 1
         );
-        CREATE INDEX IF NOT EXISTS idx_painel_mensagens_ativo
-            ON painel_vendas_mensagens(ativo,criado_em);
-
         INSERT IGNORE INTO painel_vendas_config(chave,valor) VALUES('dias_meta','26');
         INSERT IGNORE INTO painel_vendas_config(chave,valor) VALUES('meta_inicio',DATE_FORMAT(CURRENT_DATE,'%Y-%m-01'));
 
@@ -620,9 +610,6 @@ function initVisitas(PDO $pdo): void {
             dados_json TEXT,
             criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
-        CREATE INDEX IF NOT EXISTS idx_arena_eventos_data ON arena_eventos(criado_em);
-        CREATE INDEX IF NOT EXISTS idx_arena_eventos_vendedor ON arena_eventos(vendedor_id);
-
         CREATE TABLE IF NOT EXISTS arena_reacoes (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             evento_id INTEGER NOT NULL,
@@ -639,8 +626,6 @@ function initVisitas(PDO $pdo): void {
             texto TEXT NOT NULL,
             criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
-        CREATE INDEX IF NOT EXISTS idx_arena_comentarios_evento ON arena_comentarios(evento_id,id);
-
         CREATE TABLE IF NOT EXISTS arena_cutucadas (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             de_usuario_id INTEGER NOT NULL,
@@ -661,9 +646,6 @@ function initVisitas(PDO $pdo): void {
             criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             respondido_em DATETIME NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_arena_desafios_data ON arena_desafios(data_desafio,status);
-
-
         CREATE TABLE IF NOT EXISTS arena_apostas (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             arena_usuario_id INTEGER NOT NULL,
@@ -675,9 +657,6 @@ function initVisitas(PDO $pdo): void {
             criada_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             resolvida_em DATETIME NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_arena_apostas_data ON arena_apostas(data_ref,status);
-        CREATE INDEX IF NOT EXISTS idx_arena_apostas_vendedor ON arena_apostas(vendedor_id,data_ref);
-
         CREATE TABLE IF NOT EXISTS arena_destaques_diarios (
             data_ref VARCHAR(10) PRIMARY KEY,
             vendedor_id INTEGER NOT NULL,
@@ -704,9 +683,6 @@ function initVisitas(PDO $pdo): void {
             UNIQUE(visita_id, matricula_id)
         );
 
-        CREATE INDEX IF NOT EXISTS idx_visita_matriculas_visita ON visita_matriculas(visita_id);
-        CREATE INDEX IF NOT EXISTS idx_visita_matriculas_aluno ON visita_matriculas(aluno_id);
-
         CREATE TABLE IF NOT EXISTS visita_matriculas_pendentes (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             visita_id INTEGER NOT NULL,
@@ -725,9 +701,6 @@ function initVisitas(PDO $pdo): void {
             criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 
-        CREATE INDEX IF NOT EXISTS idx_vm_pend_visita ON visita_matriculas_pendentes(visita_id);
-        CREATE INDEX IF NOT EXISTS idx_vm_pend_aluno ON visita_matriculas_pendentes(aluno_id);
-
         CREATE TABLE IF NOT EXISTS controle_qualidade_contratos (
             visita_id INTEGER PRIMARY KEY,
             status VARCHAR(24) NOT NULL DEFAULT 'nao_revisado'
@@ -737,8 +710,6 @@ function initVisitas(PDO $pdo): void {
             atualizado_por INTEGER NULL,
             atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
-        CREATE INDEX IF NOT EXISTS idx_cq_status ON controle_qualidade_contratos(status);
-
         CREATE TABLE IF NOT EXISTS roleta_premios (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             nome TEXT NOT NULL,
@@ -754,8 +725,6 @@ function initVisitas(PDO $pdo): void {
             criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(vendedor_id, data_ref)
         );
-
-        CREATE INDEX IF NOT EXISTS idx_roleta_giros_data ON roleta_giros(data_ref);
 
         CREATE TABLE IF NOT EXISTS acompanhamento_vendedor (
             vendedor_id INTEGER NOT NULL,
