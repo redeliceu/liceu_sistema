@@ -14,12 +14,12 @@ function analyticsSchema(PDO $pdo): void {
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
         nome_arquivo TEXT NOT NULL,
         periodo TEXT NULL,
-        hash_arquivo TEXT NOT NULL UNIQUE,
+        hash_arquivo CHAR(64) NOT NULL UNIQUE,
         qtd_lancamentos INTEGER NOT NULL DEFAULT 0,
         importado_por INTEGER NULL,
-        criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS analytics_sponte_lancamentos(
+        criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS analytics_sponte_lancamentos(
         lancamento_id INTEGER PRIMARY KEY,
         data TEXT NULL,
         data_repasse TEXT NULL,
@@ -36,15 +36,25 @@ function analyticsSchema(PDO $pdo): void {
         contrato TEXT NULL,
         categoria TEXT NULL,
         saldo REAL NULL,
-        importacao_id INTEGER NULL,
-        aluno_id INTEGER NULL,
+        importacao_id BIGINT NULL,
+        aluno_id BIGINT NULL,
         match_tipo TEXT NULL,
         FOREIGN KEY(importacao_id) REFERENCES analytics_sponte_importacoes(id) ON DELETE SET NULL,
         FOREIGN KEY(aluno_id) REFERENCES alunos(id) ON DELETE SET NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_asl_data ON analytics_sponte_lancamentos(data);
-    CREATE INDEX IF NOT EXISTS idx_asl_cat ON analytics_sponte_lancamentos(categoria);
-    CREATE INDEX IF NOT EXISTS idx_asl_aluno ON analytics_sponte_lancamentos(aluno_id);");
+    ) ENGINE=InnoDB");
+
+    $indexes = [
+        'idx_asl_data' => 'CREATE INDEX idx_asl_data ON analytics_sponte_lancamentos(data(19))',
+        'idx_asl_cat' => 'CREATE INDEX idx_asl_cat ON analytics_sponte_lancamentos(categoria(191))',
+        'idx_asl_aluno' => 'CREATE INDEX idx_asl_aluno ON analytics_sponte_lancamentos(aluno_id)',
+    ];
+    $indexExists = $pdo->prepare('SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ? LIMIT 1');
+    foreach ($indexes as $name => $sql) {
+        $indexExists->execute(['analytics_sponte_lancamentos', $name]);
+        if ($indexExists->fetchColumn() === false) {
+            $pdo->exec($sql);
+        }
+    }
 }
 analyticsSchema($pdo);
 
