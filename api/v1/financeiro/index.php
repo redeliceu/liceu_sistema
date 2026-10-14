@@ -36,13 +36,15 @@ if($clientName===null){
 $pdo=db();
 $pdo->exec("CREATE TABLE IF NOT EXISTS api_finance_access_log(
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    cliente TEXT NOT NULL,
-    ip TEXT NOT NULL,
-    endpoint TEXT NOT NULL,
-    status_http INTEGER NOT NULL,
-    criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    cliente VARCHAR(100) NOT NULL,
+    ip VARCHAR(45) NOT NULL,
+    endpoint VARCHAR(255) NOT NULL,
+    status_http SMALLINT NOT NULL,
+    criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 )");
-$pdo->exec("CREATE INDEX IF NOT EXISTS idx_api_finance_access_rate ON api_finance_access_log(cliente,ip,criado_em)");
+if(!indiceExiste($pdo,'idx_api_finance_access_rate')){
+    $pdo->exec("CREATE INDEX idx_api_finance_access_rate ON api_finance_access_log(cliente,ip,criado_em)");
+}
 $pdo->exec("DELETE FROM api_finance_access_log WHERE criado_em < DATE_SUB(NOW(), INTERVAL 7 DAY)");
 
 $ip=liceuClientIp();

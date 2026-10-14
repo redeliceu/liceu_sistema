@@ -47,7 +47,7 @@ Os valores acima são apenas exemplo de formato. A resposta real vem diretamente
 - somente GET;
 - Bearer token individual;
 - 120 requisições/minuto por cliente + IP;
-- log de acessos no SQLite por 7 dias;
+- log de acessos no MySQL por 7 dias;
 - não expõe alunos, documentos, matrículas individuais ou vendedores;
 - use exclusivamente por HTTPS.
 
