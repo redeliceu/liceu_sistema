@@ -3954,6 +3954,8 @@ function applyAdminUI() {
   function confirmModal() {
     if(modalMode === 'admin-login') adminLogin();
     else if(modalMode === 'chamada') saveChamada();
+    else if(modalMode === 'evento-aula') salvarEventoAula();
+    else if(modalMode === 'trocar-professor') salvarTrocaProfessor();
     else if(modalMode === 'aluno') saveAluno();
     else if(modalMode === 'imprimir-chamadas-dia') imprimirChamadasDia();
     else if(modalMode === 'vincular-aluno') saveVinculoAluno();
@@ -4106,6 +4108,22 @@ function applyAdminUI() {
       : 'Clique para recolher a sequência de módulos.';
   }
 
+  async function trocarProfessorTurma(agendaId,turmaId) {
+    if(!exigirAdminFront()) return;
+    const turma=db.turmas.find(t=>t.id===turmaId);
+    if(!turma) return;
+    const opcoes=db.professores.filter(p=>p.id!==turma.profId);
+    if(!opcoes.length){alert('Nenhum outro professor cadastrado.');return;}
+    const lista=opcoes.map(p=>`${p.id} — ${p.nome}`).join('\n');
+    const escolhido=prompt(`Trocar professor de ${turma.nome}\nInforme o código do novo professor:\n${lista}`);
+    if(escolhido===null) return;
+    const novo=Number(escolhido);
+    if(!opcoes.some(p=>p.id===novo)){alert('Código de professor inválido.');return;}
+    if(!confirm('Confirmar troca de professor? A turma, sala, alunos e chamadas anteriores serão preservados.'))return;
+    try{await api('trocar_professor_turma',{agendaId,professorId:novo});alert('Professor atualizado.');location.reload();}
+    catch(e){alert(e.message||'Não foi possível trocar o professor.');}
+  }
+
   async function openTurmaDetalhes(turmaId, agendaId, dia, horario, salaId) {
     const turma = db.turmas.find(t => t.id === turmaId);
     if(!turma) return;
@@ -4118,7 +4136,8 @@ function applyAdminUI() {
       const formadosHistorico = alunos.filter(a => a.matriculaStatus === 'formado');
       const canceladosHistorico = alunos.filter(a => a.matriculaStatus === 'cancelado');
       const sala = db.salas.find(s => s.id === salaId);
-      const prof = db.professores.find(p => p.id === turma.profId);
+      const itemProfessorAgenda=db.agenda?.[dia]?.[horario]?.[salaId];
+      const prof = db.professores.find(p => p.id === (itemProfessorAgenda?.profId || turma.profId));
 
       const modulos = r.modulos || [];
       const aulasRealizadas = Number(r.aulasRealizadas || 0);
@@ -4207,8 +4226,11 @@ function applyAdminUI() {
                 <button class="btn btn-ghost" type="button" onclick="toggleTurmaActions(this,event)">Gerenciar turma <span style="font-size:.72rem">▾</span></button>
                 <div class="turma-actions-menu" onclick="event.stopPropagation()">
                   <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openVincularAluno(${turmaId}, ${agendaId})"><span class="menu-ico">＋</span><span>Vincular aluno</span></button>
+                  <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openEventoAula(${agendaId})"><span class="menu-ico">▦</span><span>Feriado / aula cancelada</span></button>
+                  <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openTrocarProfessor(${agendaId},${turmaId})"><span class="menu-ico">⇆</span><span>Trocar professor</span></button>
                   <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openModulosModal(${turmaId}, ${agendaId})"><span class="menu-ico">▤</span><span>Módulos desta turma</span></button>
                   <button class="turma-actions-item" type="button" onclick="closeTurmaActions();abrirRelatorioTurma()"><span class="menu-ico">▧</span><span>Relatório da turma</span></button>
+
                   <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openAgendaModal('${esc(dia)}','${esc(horario)}','${esc(salaId)}')"><span class="menu-ico">✎</span><span>Editar turma</span></button>
                   <button class="turma-actions-item" type="button" onclick="closeTurmaActions();openMigrarTurmaSala(${turmaId}, '${esc(dia)}', '${esc(horario)}', '${esc(salaId)}')"><span class="menu-ico">⇄</span><span>Migrar sala</span></button>
                   <div class="turma-actions-divider"></div>
@@ -4497,6 +4519,39 @@ function applyAdminUI() {
     const {turmaId,agendaId,horario}=modalEditId;const dataAula=document.getElementById('mChamadaData')?.value||modalEditId.dataAula;
     try{const r=await apiGet('chamada_detalhes',{turmaId,agendaId,dataAula,horario,moduloId});modalEditId.moduloId=Number(r.moduloId||0);const box=document.getElementById('chamadaListaAlunos');if(box){box.innerHTML=(r.alunos||[]).length?(r.alunos||[]).map(linhaAlunoChamada).join(''):`<div class="student-meta">Nenhum aluno liberado para este módulo.</div>`;document.querySelectorAll('.presenca-check').forEach(c=>c.addEventListener('change',atualizarResumoChamada));atualizarResumoChamada();}}
     catch(e){toast(e.message);}
+  }
+
+  async function openEventoAula(agendaId){
+    if(!exigirAdminFront())return;
+    const data=new Date(), hoje=`${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,'0')}-${String(data.getDate()).padStart(2,'0')}`;
+    modalMode='evento-aula';modalEditId={agendaId};
+    document.getElementById('modalTitle').textContent='Feriado / aula cancelada';
+    document.getElementById('modalBody').innerHTML=`<div class="form-group"><label>Data</label><input type="date" id="eventoData" value="${hoje}" onchange="consultarEventoAula()"></div><div class="form-group"><label>Situação</label><select id="eventoTipo"><option value="feriado">Feriado</option><option value="aula_cancelada">Aula cancelada</option><option value="normal">Remover marcação / aula normal</option></select></div><div class="form-group"><label>Observação</label><input id="eventoObs" maxlength="500" placeholder="Motivo (opcional)"></div><div class="student-meta">Feriado e cancelamento não geram presença, falta ou avanço de módulo. Chamadas já existentes não serão apagadas.</div>`;
+    document.getElementById('modalActions').style.display='flex';document.getElementById('modalConfirm').textContent='Salvar situação';openModal();consultarEventoAula();
+  }
+  async function consultarEventoAula(){
+    const dt=document.getElementById('eventoData')?.value;if(!dt)return;
+    try{const r=await apiGet('evento_aula_consultar',{agendaId:modalEditId.agendaId,dataAula:dt});
+      document.getElementById('eventoTipo').value=r.evento?.tipo||'feriado';document.getElementById('eventoObs').value=r.evento?.observacao||'';
+    }catch(e){toast(e.message)}
+  }
+  async function salvarEventoAula(){
+    try{await api('evento_aula_salvar',{agendaId:modalEditId.agendaId,dataAula:document.getElementById('eventoData').value,tipo:document.getElementById('eventoTipo').value,observacao:document.getElementById('eventoObs').value});closeModal();toast('Situação da aula salva.');}
+    catch(e){toast(e.message)}
+  }
+  function openTrocarProfessor(agendaId,turmaId){
+    if(!exigirAdminFront())return;
+    const t=db.turmas.find(x=>x.id===turmaId);if(!t)return;
+    const ag=Object.values(db.agenda||{}).flatMap(h=>Object.values(h)).flatMap(s=>Object.values(s)).find(x=>Number(x.agendaId)===Number(agendaId));
+    const professorAtual=Number(ag?.profId||t.profId);
+    modalMode='trocar-professor';modalEditId={agendaId,turmaId};
+    document.getElementById('modalTitle').textContent='Trocar professor • '+t.nome;
+    document.getElementById('modalBody').innerHTML=`<p class="student-meta">Somente o professor desta alocação muda. Outras alocações, alunos, sala e chamadas anteriores permanecem.</p><div class="form-group"><label>Novo professor</label><select id="novoProfTurma">${db.professores.map(p=>`<option value="${p.id}" ${p.id===professorAtual?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></div>`;
+    document.getElementById('modalActions').style.display='flex';document.getElementById('modalConfirm').textContent='Confirmar troca';openModal();
+  }
+  async function salvarTrocaProfessor(){
+    try{await api('trocar_professor_turma',{agendaId:modalEditId.agendaId,professorId:Number(document.getElementById('novoProfTurma').value)});await atualizarInterfaceSistema();closeModal();toast('Professor atualizado sem interromper a turma.');}
+    catch(e){toast(e.message)}
   }
 
   async function openChamada(turmaId, agendaId, dia, horario) {
@@ -4981,7 +5036,7 @@ function applyAdminUI() {
       <div class="migration-box">
         <div class="migration-box-title">Turma / horário de destino</div>
         <div class="form-group" style="margin-bottom:0">
-          <select id="mMigrarAlunoDestino">
+          <select id="mMigrarAlunoDestino" size="6" style="width:100%">
             ${destinos.map(d=>`<option value="${d.agendaId}">${esc(d.nome)} • ${esc(d.professor)} • ${esc(d.dia)} • ${esc(d.horario)} • ${esc(d.sala)}</option>`).join('')}
           </select>
         </div>

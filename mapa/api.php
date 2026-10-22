@@ -23,7 +23,7 @@ if (session_status() === PHP_SESSION_ACTIVE) {
 $action = $_GET['action'] ?? '';
 
 // V53 — autorização por ação. Perfil é apenas o padrão; exceções individuais são resolvidas por authPermission().
-$__mapRead=['auth_status','relatorio_inicios','alunos_nao_alocados','load','alunos_ativos_sponte','correspondencias_sponte','cancelamentos_sponte','aluno_pagamentos','exclusao_aluno_status','previsao_ingresso','matriculas_ativas_aluno','cancelados','formados','turma_detalhes','chamada_detalhes','chamada_planejamento_mensal','aluno_historico','boletim_aluno','logs','acompanhamento_dia','acompanhamento_periodo','acompanhamento_geral','relatorio_retencao_professores','radar_gestao','relatorio_horista'];
+$__mapRead=['auth_status','relatorio_inicios','alunos_nao_alocados','load','alunos_ativos_sponte','correspondencias_sponte','cancelamentos_sponte','aluno_pagamentos','exclusao_aluno_status','previsao_ingresso','matriculas_ativas_aluno','cancelados','formados','turma_detalhes','chamada_detalhes','chamada_planejamento_mensal','aluno_historico','boletim_aluno','logs','acompanhamento_dia','acompanhamento_periodo','acompanhamento_geral','relatorio_retencao_professores','radar_gestao','relatorio_horista','historico_sala'];
 $__mapSupremo=['recruzar_pagamentos_sponte','reconstruir_pagamentos_sponte','upload_chunk_alunos_sponte','importar_alunos_ativos_sponte','incluir_aluno_sponte','vincular_correspondencia_sponte','aplicar_cancelamento_sponte_manual','atualizar_motivo_cancelamento_sponte','importar_pagamentos_sponte','importar_inadimplencia_sponte','configurar_senha_exclusao','delete_aluno','import_preview','migrar_aluno','migrar_turma_sala','salvar_gestao_matricula','bloquear_por_inadimplencia'];
 if (!authLogged()) resposta(['ok'=>false,'error'=>'Sessão expirada.'],401);
 $__authPdo=db();
@@ -1098,6 +1098,60 @@ function scoreTurmaSponte(string $origem,array $ag): int
 }
 
     switch ($action) {
+        case 'trocar_professor_turma':
+            exigirAdmin();
+            $d=corpoJson();
+            $agendaId=(int)($d['agendaId']??0);
+            $novoId=(int)($d['professorId']??0);
+            if($agendaId<=0||$novoId<=0) resposta(['ok'=>false,'error'=>'Informe alocação e professor.'],422);
+            $pdo->beginTransaction();
+            try {
+                $st=$pdo->prepare("SELECT ag.id,ag.turma_id,COALESCE(ag.professor_id,t.prof_id) professor_atual FROM agenda ag JOIN turmas t ON t.id=ag.turma_id WHERE ag.id=? FOR UPDATE");
+                $st->execute([$agendaId]);$alocacao=$st->fetch(PDO::FETCH_ASSOC);
+                if(!$alocacao) throw new RuntimeException('Alocação não encontrada.');
+                $st=$pdo->prepare("SELECT id FROM professores WHERE id=?");$st->execute([$novoId]);
+                if(!$st->fetchColumn()) throw new RuntimeException('Professor não encontrado.');
+                $antigo=(int)$alocacao['professor_atual'];
+                if($antigo!==$novoId){
+                    $st=$pdo->prepare("UPDATE agenda SET professor_id=? WHERE id=?");$st->execute([$novoId,$agendaId]);
+                    $st=$pdo->prepare("INSERT INTO mapa_trocas_professor (turma_id,agenda_id,professor_anterior_id,professor_novo_id) VALUES (?,?,?,?)");
+                    $st->execute([(int)$alocacao['turma_id'],$agendaId,$antigo?:null,$novoId]);
+                }
+                $pdo->commit();
+                resposta(['ok'=>true,'alterado'=>$antigo!==$novoId,'agendaId'=>$agendaId]);
+            } catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+
+        case 'historico_sala':
+            $salaId=trim((string)($_GET['salaId']??''));
+            if($salaId==='') resposta(['ok'=>false,'error'=>'Sala não informada.'],422);
+            // Sem tabela de eventos de ocupação, não inventar períodos de turmas migradas.
+            $st=$pdo->prepare("SELECT t.nome turma,p.nome professor,ag.dia,ag.horario,ag.data_inicio dataInicio,ag.status,ag.id agendaId FROM agenda ag JOIN turmas t ON t.id=ag.turma_id LEFT JOIN professores p ON p.id=COALESCE(ag.professor_id,t.prof_id) WHERE ag.sala_id=? ORDER BY ag.id DESC LIMIT 100");
+            $st->execute([$salaId]);
+            resposta(['ok'=>true,'historico'=>array_map(static function($r){$r['dataFim']=null;$r['motivo']='Registro de alocação atual; encerramento histórico não verificado';return $r;},$st->fetchAll())]);
+
+        case 'evento_aula_consultar':
+            exigirLeituraMapa();
+            $agendaId=(int)($_GET['agendaId']??0);
+            $data=trim((string)($_GET['dataAula']??''));
+            if($agendaId<=0||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$data)) resposta(['ok'=>false,'error'=>'Dados inválidos.'],422);
+            $st=$pdo->prepare("SELECT tipo,observacao FROM mapa_eventos_aula WHERE agenda_id=? AND data_aula=?");
+            $st->execute([$agendaId,$data]);
+            resposta(['ok'=>true,'evento'=>$st->fetch(PDO::FETCH_ASSOC)?:null]);
+
+        case 'evento_aula_salvar':
+            exigirAdmin();
+            $d=corpoJson();$agendaId=(int)($d['agendaId']??0);
+            $data=trim((string)($d['dataAula']??''));$tipo=trim((string)($d['tipo']??''));
+            $obs=mb_substr(trim((string)($d['observacao']??'')),0,500);
+            if($agendaId<=0||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$data)||!in_array($tipo,['feriado','aula_cancelada','normal'],true)) resposta(['ok'=>false,'error'=>'Dados do evento inválidos.'],422);
+            $st=$pdo->prepare("SELECT id FROM agenda WHERE id=?");$st->execute([$agendaId]);
+            if(!$st->fetchColumn()) resposta(['ok'=>false,'error'=>'Alocação inexistente.'],404);
+            $st=$pdo->prepare("SELECT COUNT(*) FROM chamadas WHERE agenda_id=? AND data_aula=?");$st->execute([$agendaId,$data]);
+            if($tipo!=='normal'&&(int)$st->fetchColumn()>0) resposta(['ok'=>false,'error'=>'Já existe chamada nessa data. Revise a chamada antes de registrar o evento; nenhum dado foi apagado.'],409);
+            if($tipo==='normal'){$st=$pdo->prepare("DELETE FROM mapa_eventos_aula WHERE agenda_id=? AND data_aula=?");$st->execute([$agendaId,$data]);}
+            else {$st=$pdo->prepare("INSERT INTO mapa_eventos_aula (agenda_id,data_aula,tipo,observacao) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE tipo=VALUES(tipo),observacao=VALUES(observacao)");$st->execute([$agendaId,$data,$tipo,$obs]);}
+            resposta(['ok'=>true]);
+
         case 'auth_status':
             liceuRequireMethod('GET');
             resposta(['ok'=>true,'isAdmin'=>isAdmin(),'logged'=>authLogged(),'role'=>authRole(),'csrfToken'=>authLogged()?authCsrfToken():null]);
@@ -1423,6 +1477,7 @@ function scoreTurmaSponte(string $origem,array $ag): int
                     a.horario,
                     a.sala_id,
                     a.turma_id,
+                    a.professor_id,
                     a.status,
                     a.tipo_curso,
                     a.data_inicio,
@@ -1459,6 +1514,7 @@ function scoreTurmaSponte(string $origem,array $ag): int
                 $prevIngresso=previsaoIngressoTurma($pdo,(int)$r['turma_id'],(int)$r['id']);
                 $agenda[$r['dia']][$r['horario']][$r['sala_id']] = [
                     'agendaId' => (int)$r['id'],
+                    'profId' => isset($r['professor_id']) && $r['professor_id'] !== null ? (int)$r['professor_id'] : null,
                     'turmaId' => (int)$r['turma_id'],
                     'alunos' => (int)$r['alunos'],
                     'status' => $r['status'] ?: 'iniciar',
@@ -2939,6 +2995,11 @@ function scoreTurmaSponte(string $origem,array $ag): int
                 if((int)date('w',strtotime($iso))===$alvo)$datas[]=$iso;
             }
 
+            $ev=$pdo->prepare("SELECT data_aula FROM mapa_eventos_aula WHERE agenda_id=? AND data_aula BETWEEN ? AND ?");
+            $ev->execute([$agendaId,$mes.'-01',$mes.'-31']);
+            $semAula=array_fill_keys($ev->fetchAll(PDO::FETCH_COLUMN),true);
+            $datas=array_values(array_filter($datas,static fn($dt)=>!isset($semAula[$dt])));
+
             $st=$pdo->prepare("SELECT id,ordem,nome,aulas_previstas FROM agenda_modulos WHERE agenda_id=? ORDER BY ordem,id");
             $st->execute([$agendaId]); $mods=$st->fetchAll();
             $cont=[]; foreach($mods as $m)$cont[(int)$m['id']]=0;
@@ -3107,6 +3168,10 @@ function scoreTurmaSponte(string $origem,array $ag): int
             $st->execute([$agendaId,$turmaId]);
             if(!$st->fetchColumn()) resposta(['ok'=>false,'error'=>'Turma/alocação inválida.'],422);
 
+            $ev=$pdo->prepare("SELECT tipo FROM mapa_eventos_aula WHERE agenda_id=? AND data_aula=?");
+            $ev->execute([$agendaId,$dataAula]);
+            if($ev->fetchColumn()) resposta(['ok'=>false,'error'=>'Esta data está marcada como feriado ou aula cancelada. Remova o evento antes de lançar chamada.'],409);
+
             $pdo->beginTransaction();
 
             try {
@@ -3127,6 +3192,10 @@ function scoreTurmaSponte(string $origem,array $ag): int
                 ]);
                 $existente = $stmt->fetch();
 
+                // Professor vigente da alocação, sem reescrever o histórico das chamadas.
+                $stProfAtual=$pdo->prepare("SELECT COALESCE(ag.professor_id,t.prof_id) FROM agenda ag JOIN turmas t ON t.id=ag.turma_id WHERE ag.id=?");
+                $stProfAtual->execute([$agendaId]);
+                $professorId=(int)$stProfAtual->fetchColumn();
                 $moduloId = $existente ? (int)($existente['agenda_modulo_id'] ?? 0) : 0;
 
                 if ($moduloIdEscolhido > 0) {
@@ -3185,7 +3254,7 @@ function scoreTurmaSponte(string $origem,array $ag): int
                             agenda_id = ?,
                             dia = ?,
                             horario = ?,
-                            professor_id = ?,
+                            professor_id = COALESCE(professor_id, ?),
                             agenda_modulo_id = ?
                         WHERE id = ?
                     ");
