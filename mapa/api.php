@@ -23,7 +23,14 @@ if (session_status() === PHP_SESSION_ACTIVE) {
 $action = $_GET['action'] ?? '';
 
 // V53 — autorização por ação. Perfil é apenas o padrão; exceções individuais são resolvidas por authPermission().
-$__mapRead=['auth_status','relatorio_inicios','alunos_nao_alocados','load','alunos_ativos_sponte','correspondencias_sponte','cancelamentos_sponte','aluno_pagamentos','exclusao_aluno_status','previsao_ingresso','matriculas_ativas_aluno','cancelados','formados','turma_detalhes','chamada_detalhes','chamada_planejamento_mensal','aluno_historico','boletim_aluno','logs','acompanhamento_dia','acompanhamento_periodo','acompanhamento_geral','relatorio_retencao_professores','radar_gestao','relatorio_horista','historico_sala'];
+// Calendário institucional: feriados abrangem todas as alocações.
+function feriadoGeralNaData(PDO $pdo, string $data): ?array {
+    $st=$pdo->prepare("SELECT data_aula,observacao FROM mapa_feriados_gerais WHERE data_aula=? LIMIT 1");
+    $st->execute([$data]);
+    return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+$__mapRead=['auth_status','relatorio_inicios','novos_visitas','alunos_nao_alocados','load','alunos_ativos_sponte','correspondencias_sponte','cancelamentos_sponte','aluno_pagamentos','exclusao_aluno_status','previsao_ingresso','matriculas_ativas_aluno','cancelados','formados','turma_detalhes','chamada_detalhes','chamada_planejamento_mensal','aluno_historico','boletim_aluno','logs','acompanhamento_dia','contatos_faltosos','acompanhamento_periodo','acompanhamento_geral','relatorio_retencao_professores','radar_gestao','relatorio_horista','historico_sala'];
 $__mapSupremo=['recruzar_pagamentos_sponte','reconstruir_pagamentos_sponte','upload_chunk_alunos_sponte','importar_alunos_ativos_sponte','incluir_aluno_sponte','vincular_correspondencia_sponte','aplicar_cancelamento_sponte_manual','atualizar_motivo_cancelamento_sponte','importar_pagamentos_sponte','importar_inadimplencia_sponte','configurar_senha_exclusao','delete_aluno','import_preview','migrar_aluno','migrar_turma_sala','salvar_gestao_matricula','bloquear_por_inadimplencia'];
 if (!authLogged()) resposta(['ok'=>false,'error'=>'Sessão expirada.'],401);
 $__authPdo=db();
@@ -345,6 +352,10 @@ function registrarLog(
 // V49: auditoria operacional do Radar. Mantém snapshots para explicar qualquer
 // aumento/queda na quantidade de matrículas pagas ativas.
 function garantirAuditoriaRadar(PDO $pdo): void {
+    // MySQL executa COMMIT implicito em CREATE TABLE, inclusive IF NOT EXISTS.
+    // Nao executar DDL durante uma transacao de matricula/alocacao.
+    if (tabelaExiste($pdo, 'radar_contagem_historico')) return;
+    if ($pdo->inTransaction()) throw new RuntimeException('Tabela de auditoria do Radar ausente; inicialize antes da transacao.');
     $pdo->exec("CREATE TABLE IF NOT EXISTS radar_contagem_historico (id BIGINT AUTO_INCREMENT PRIMARY KEY, matriculas_pagas_ativas INTEGER NOT NULL, alunos_unicos INTEGER NOT NULL, motivo TEXT, entidade_tipo TEXT, entidade_id TEXT, dados_json TEXT, criado_em TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)) ");
 }
 function snapshotRadar(PDO $pdo, string $motivo, ?string $entidadeTipo=null, string|int|null $entidadeId=null, array $dados=[]): void {
@@ -1129,11 +1140,19 @@ function scoreTurmaSponte(string $origem,array $ag): int
             $st->execute([$salaId]);
             resposta(['ok'=>true,'historico'=>array_map(static function($r){$r['dataFim']=null;$r['motivo']='Registro de alocação atual; encerramento histórico não verificado';return $r;},$st->fetchAll())]);
 
+        case 'calendario_feriado_consultar':
+            exigirLeituraMapa();
+            $data=trim((string)($_GET['dataAula']??''));
+            if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$data)) resposta(['ok'=>false,'error'=>'Data inválida.'],422);
+            resposta(['ok'=>true,'feriado'=>feriadoGeralNaData($pdo,$data)]);
+
         case 'evento_aula_consultar':
             exigirLeituraMapa();
             $agendaId=(int)($_GET['agendaId']??0);
             $data=trim((string)($_GET['dataAula']??''));
             if($agendaId<=0||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$data)) resposta(['ok'=>false,'error'=>'Dados inválidos.'],422);
+            $feriado=feriadoGeralNaData($pdo,$data);
+            if($feriado) resposta(['ok'=>true,'evento'=>['tipo'=>'feriado','observacao'=>$feriado['observacao'],'universal'=>true]]);
             $st=$pdo->prepare("SELECT tipo,observacao FROM mapa_eventos_aula WHERE agenda_id=? AND data_aula=?");
             $st->execute([$agendaId,$data]);
             resposta(['ok'=>true,'evento'=>$st->fetch(PDO::FETCH_ASSOC)?:null]);
@@ -1146,10 +1165,23 @@ function scoreTurmaSponte(string $origem,array $ag): int
             if($agendaId<=0||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$data)||!in_array($tipo,['feriado','aula_cancelada','normal'],true)) resposta(['ok'=>false,'error'=>'Dados do evento inválidos.'],422);
             $st=$pdo->prepare("SELECT id FROM agenda WHERE id=?");$st->execute([$agendaId]);
             if(!$st->fetchColumn()) resposta(['ok'=>false,'error'=>'Alocação inexistente.'],404);
-            $st=$pdo->prepare("SELECT COUNT(*) FROM chamadas WHERE agenda_id=? AND data_aula=?");$st->execute([$agendaId,$data]);
-            if($tipo!=='normal'&&(int)$st->fetchColumn()>0) resposta(['ok'=>false,'error'=>'Já existe chamada nessa data. Revise a chamada antes de registrar o evento; nenhum dado foi apagado.'],409);
-            if($tipo==='normal'){$st=$pdo->prepare("DELETE FROM mapa_eventos_aula WHERE agenda_id=? AND data_aula=?");$st->execute([$agendaId,$data]);}
-            else {$st=$pdo->prepare("INSERT INTO mapa_eventos_aula (agenda_id,data_aula,tipo,observacao) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE tipo=VALUES(tipo),observacao=VALUES(observacao)");$st->execute([$agendaId,$data,$tipo,$obs]);}
+            if($tipo==='feriado'){
+                // Impedir marcação geral quando já existem chamadas em qualquer turma.
+                $st=$pdo->prepare("SELECT COUNT(*) FROM chamadas WHERE data_aula=?");$st->execute([$data]);
+                if((int)$st->fetchColumn()>0) resposta(['ok'=>false,'error'=>'Existem chamadas registradas nesta data. O feriado geral não foi criado; revise as chamadas antes.'],409);
+                $st=$pdo->prepare("INSERT INTO mapa_feriados_gerais (data_aula,observacao) VALUES (?,?) ON DUPLICATE KEY UPDATE observacao=VALUES(observacao)");
+                $st->execute([$data,$obs]);
+            }elseif($tipo==='normal'){
+                // Remover feriado geral somente com confirmação explícita na interface.
+                $removerGeral=!empty($d['removerFeriadoGeral']);
+                if($removerGeral){$st=$pdo->prepare("DELETE FROM mapa_feriados_gerais WHERE data_aula=?");$st->execute([$data]);}
+                else{$st=$pdo->prepare("DELETE FROM mapa_eventos_aula WHERE agenda_id=? AND data_aula=?");$st->execute([$agendaId,$data]);}
+            }else{
+                if(feriadoGeralNaData($pdo,$data)) resposta(['ok'=>false,'error'=>'A data já possui feriado geral. Remova-o antes de cancelar uma aula individual.'],409);
+                $st=$pdo->prepare("SELECT COUNT(*) FROM chamadas WHERE agenda_id=? AND data_aula=?");$st->execute([$agendaId,$data]);
+                if((int)$st->fetchColumn()>0) resposta(['ok'=>false,'error'=>'Já existe chamada nesta data. Nenhum dado foi apagado.'],409);
+                $st=$pdo->prepare("INSERT INTO mapa_eventos_aula (agenda_id,data_aula,tipo,observacao) VALUES (?,?,'aula_cancelada',?) ON DUPLICATE KEY UPDATE tipo=VALUES(tipo),observacao=VALUES(observacao)");$st->execute([$agendaId,$data,$obs]);
+            }
             resposta(['ok'=>true]);
 
         case 'auth_status':
@@ -2540,6 +2572,16 @@ function scoreTurmaSponte(string $origem,array $ag): int
                           FROM visita_matriculas_pendentes vp
                           INNER JOIN alunos a ON a.id=vp.aluno_id
                           WHERE COALESCE(vp.status,'pendente_alocacao')='pendente_alocacao'
+                            AND NOT EXISTS (
+                              SELECT 1 FROM matriculas m
+                              JOIN agenda ag ON ag.id=m.agenda_id
+                              JOIN turmas t ON t.id=m.turma_id
+                              WHERE m.aluno_id=vp.aluno_id AND m.status='ativo'
+                                AND (
+                                    TRIM(t.nome) COLLATE utf8mb4_unicode_ci = TRIM(vp.curso_nome) COLLATE utf8mb4_unicode_ci
+                                    OR TRIM(t.nome) COLLATE utf8mb4_unicode_ci LIKE CONCAT(TRIM(vp.curso_nome), ' - %') COLLATE utf8mb4_unicode_ci
+                                )
+                            )
                           ORDER BY vp.criado_em ASC,vp.id ASC";
                     $st=$pdo->query($sql);
                     foreach($st->fetchAll() as $r){
@@ -2554,7 +2596,7 @@ function scoreTurmaSponte(string $origem,array $ag): int
                 $sqlAg="SELECT ag.id agenda_id,ag.turma_id,t.nome turma,ag.dia,ag.horario,ag.sala_id,ag.tipo_curso,ag.status,ag.data_inicio,ag.capacidade_excepcional,t.capacidade turma_capacidade
                         FROM agenda ag INNER JOIN turmas t ON t.id=ag.turma_id
                         WHERE COALESCE(t.status,'aberta')<>'encerrada'
-                          AND COALESCE(ag.status,'iniciar') NOT IN ('encerrada','finalizada','concluida','andamento_fechada')
+                          AND COALESCE(ag.status,'iniciar') IN ('iniciar','andamento','andamento_aberta')
                         ORDER BY t.nome,ag.dia,ag.horario";
                 foreach($pdo->query($sqlAg)->fetchAll() as $r){
                     $cap=(int)($r['capacidade_excepcional']??0);
@@ -2576,11 +2618,16 @@ function scoreTurmaSponte(string $origem,array $ag): int
             if($pendingId<=0||$agendaId<=0) resposta(['ok'=>false,'error'=>'Matrícula pendente e turma são obrigatórias.'],422);
             if(!tabelaExiste($pdo,'visita_matriculas_pendentes')) resposta(['ok'=>false,'error'=>'Estrutura de matrículas pendentes não encontrada.'],409);
             $st=$pdo->prepare("SELECT * FROM visita_matriculas_pendentes WHERE id=? AND status='pendente_alocacao' LIMIT 1");$st->execute([$pendingId]);$pend=$st->fetch();if(!$pend) resposta(['ok'=>false,'error'=>'Matrícula pendente não encontrada ou já alocada.'],404);
-            $st=$pdo->prepare("SELECT ag.*,t.id turma_id,t.nome turma_nome,COALESCE(NULLIF(ag.capacidade_excepcional,0),s.capacidade,10) capacidade FROM agenda ag JOIN turmas t ON t.id=ag.turma_id LEFT JOIN salas s ON s.id=ag.sala_id WHERE ag.id=? LIMIT 1");$st->execute([$agendaId]);$ag=$st->fetch();if(!$ag) resposta(['ok'=>false,'error'=>'Turma/alocação não encontrada.'],404);
+            $st=$pdo->prepare("SELECT ag.*,t.id turma_id,t.nome turma_nome,COALESCE(NULLIF(ag.capacidade_excepcional,0),NULLIF(s.capacidade,0),NULLIF(t.capacidade,0),10) capacidade FROM agenda ag JOIN turmas t ON t.id=ag.turma_id LEFT JOIN salas s ON s.id=ag.sala_id WHERE ag.id=? LIMIT 1");$st->execute([$agendaId]);$ag=$st->fetch();if(!$ag) resposta(['ok'=>false,'error'=>'Turma/alocação não encontrada.'],404);
             $tipoEsperado=((string)$pend['tipo_ingresso']==='gratuito')?'gratuito':'pago';if((string)($ag['tipo_curso']??'pago')!==$tipoEsperado) resposta(['ok'=>false,'error'=>'Escolha uma turma do mesmo tipo da matrícula (paga/gratuita).'],409);
             if(!in_array((string)$ag['status'],['iniciar','andamento','andamento_aberta'],true)) resposta(['ok'=>false,'error'=>'Esta turma não aceita novas matrículas.'],409);
             $st=$pdo->prepare("SELECT COUNT(*) FROM matriculas WHERE agenda_id=? AND status='ativo'");$st->execute([$agendaId]);if((int)$st->fetchColumn()>=(int)$ag['capacidade']) resposta(['ok'=>false,'error'=>'A turma atingiu a capacidade da sala.'],409);
-            $alunoId=(int)$pend['aluno_id'];$visitaId=(int)$pend['visita_id'];$turmaId=(int)$ag['turma_id'];$ingresso=previsaoIngressoTurma($pdo,$turmaId,$agendaId);$sp=!empty($ingresso['aguardando'])?'aguardando_inicio':'ativo';
+            $alunoId=(int)$pend['aluno_id'];$visitaId=(int)$pend['visita_id'];$turmaId=(int)$ag['turma_id'];
+            $st=$pdo->prepare("SELECT id FROM matriculas WHERE aluno_id=? AND agenda_id=? AND status='ativo' LIMIT 1");
+            $st->execute([$alunoId,$agendaId]);
+            if($st->fetchColumn()) resposta(['ok'=>false,'error'=>'O aluno já está matriculado nesta alocação. Verifique a matrícula antes de confirmar a pendência.'],409);
+$ingresso=previsaoIngressoTurma($pdo,$turmaId,$agendaId);$sp=!empty($ingresso['aguardando'])?'aguardando_inicio':'ativo';
+            garantirAuditoriaRadar($pdo);
             $pdo->beginTransaction();try{
                 $st=$pdo->prepare("INSERT INTO matriculas(aluno_id,turma_id,agenda_id,status,origem,origem_id,vendedor_id,tipo_ingresso,status_participacao,data_inicio_participacao,agenda_modulo_ingresso_id) VALUES(?,?,?,'ativo','visita',?,?,?,?,?,?) ON DUPLICATE KEY UPDATE status='ativo',data_saida=NULL,turma_destino_id=NULL,motivo_saida=NULL,origem='visita',origem_id=VALUES(origem_id),vendedor_id=VALUES(vendedor_id),tipo_ingresso=VALUES(tipo_ingresso),status_participacao=VALUES(status_participacao),data_inicio_participacao=VALUES(data_inicio_participacao),agenda_modulo_ingresso_id=VALUES(agenda_modulo_ingresso_id)");
                 $st->execute([$alunoId,$turmaId,$agendaId,(string)$visitaId,$pend['vendedor_id']!==null?(int)$pend['vendedor_id']:null,$pend['tipo_ingresso'],$sp,$ingresso['dataInicio']??null,$ingresso['moduloIngressoId']??null]);
@@ -2630,16 +2677,45 @@ function scoreTurmaSponte(string $origem,array $ag): int
 
             $ingresso=previsaoIngressoTurma($pdo,$turmaId,$agendaId);
             $statusParticipacao=!empty($ingresso['aguardando'])?'aguardando_inicio':'ativo';
-            $stmt=$pdo->prepare("
-                INSERT INTO matriculas(aluno_id,turma_id,agenda_id,status,status_participacao,data_inicio_participacao,agenda_modulo_ingresso_id)
-                VALUES(?,?,?,?,?,?,?)
-                ON DUPLICATE KEY UPDATE
-                    status=VALUES(status),
-                    status_participacao=VALUES(status_participacao),
-                    data_inicio_participacao=VALUES(data_inicio_participacao),
-                    agenda_modulo_ingresso_id=VALUES(agenda_modulo_ingresso_id)
-            ");
-            $stmt->execute([$alunoId,$turmaId,$agendaId,$status,$statusParticipacao,$ingresso['dataInicio']??null,$ingresso['moduloIngressoId']??null]);
+            $pdo->beginTransaction();
+            try {
+                $stmt=$pdo->prepare("INSERT INTO matriculas(aluno_id,turma_id,agenda_id,status,status_participacao,data_inicio_participacao,agenda_modulo_ingresso_id) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status),status_participacao=VALUES(status_participacao),data_inicio_participacao=VALUES(data_inicio_participacao),agenda_modulo_ingresso_id=VALUES(agenda_modulo_ingresso_id)");
+                $stmt->execute([$alunoId,$turmaId,$agendaId,$status,$statusParticipacao,$ingresso['dataInicio']??null,$ingresso['moduloIngressoId']??null]);
+                // Reconciliar somente a pendência correspondente ao curso e tipo da alocação.
+                // Se houver ambiguidade, preservar as pendências para revisão manual.
+                if($status==='ativo' && tabelaExiste($pdo,'visita_matriculas_pendentes')) {
+                    $st=$pdo->prepare("SELECT t.nome,ag.tipo_curso FROM agenda ag JOIN turmas t ON t.id=ag.turma_id WHERE ag.id=? AND ag.turma_id=? LIMIT 1");
+                    $st->execute([$agendaId,$turmaId]);$dest=$st->fetch();
+                    if($dest){
+                        $tipoEsperado=((string)$dest['tipo_curso']==='gratuito')?'gratuito':'venda';
+                        $st=$pdo->prepare("SELECT * FROM visita_matriculas_pendentes WHERE aluno_id=? AND status='pendente_alocacao' AND tipo_ingresso=? FOR UPDATE");
+                        $st->execute([$alunoId,$tipoEsperado]);$pendencias=$st->fetchAll();
+                        $normalizar=function($v){$v=trim((string)$v);$v=function_exists('mb_strtolower')?mb_strtolower($v,'UTF-8'):strtolower($v);return preg_replace('/\s+/u',' ',$v);};
+                        $match=array_values(array_filter($pendencias,fn($p)=>$normalizar($p['curso_nome'])===$normalizar($dest['nome'])));
+                        if(count($match)===1){
+                            $pend=$match[0];
+                            $st=$pdo->prepare("SELECT id FROM matriculas WHERE aluno_id=? AND turma_id=? AND agenda_id=? LIMIT 1");
+                            $st->execute([$alunoId,$turmaId,$agendaId]);$matriculaId=(int)$st->fetchColumn();
+                            $visitaId=(int)$pend['visita_id'];
+                            if(tabelaExiste($pdo,'visita_matriculas')){
+                                $cols=['visita_id','aluno_id','matricula_id','agenda_id','tipo_ingresso','vendedor_id','duracao_contrato','plano_financeiro_id','plano_financeiro_v2_id','plano_financeiro_nome','taxa_matricula','valor_parcela','valor_pontualidade','taxa_status','taxa_vencimento','taxa_pago_em','central_enrollment_external_id','criado_em'];
+                                $usable=array_values(array_filter($cols,fn($c)=>colunaExiste($pdo,'visita_matriculas',$c)));
+                                $vals=[];foreach($usable as $c){if($c==='matricula_id')$vals[]=$matriculaId;elseif($c==='agenda_id')$vals[]=$agendaId;else $vals[]=$pend[$c]??null;}
+                                $sql="INSERT INTO visita_matriculas(".implode(',',$usable).") VALUES(".implode(',',array_fill(0,count($usable),'?')).") ON DUPLICATE KEY UPDATE agenda_id=VALUES(agenda_id)";
+                                $pdo->prepare($sql)->execute($vals);
+                            }
+                            $pdo->prepare("UPDATE matriculas SET origem='visita',origem_id=?,vendedor_id=?,tipo_ingresso=? WHERE id=?")->execute([(string)$visitaId,$pend['vendedor_id'],$pend['tipo_ingresso'],$matriculaId]);
+                            $pdo->prepare("DELETE FROM visita_matriculas_pendentes WHERE id=?")->execute([(int)$pend['id']]);
+                            if(tabelaExiste($pdo,'visitas')){
+                                $st=$pdo->prepare("SELECT dados_json FROM visitas WHERE id=?");$st->execute([$visitaId]);$vj=json_decode((string)$st->fetchColumn(),true);if(!is_array($vj))$vj=[];$vj['agendaId']=$agendaId;$vj['matriculaId']=$matriculaId;
+                                $pdo->prepare("UPDATE visitas SET agenda_id=?,matricula_id=?,dados_json=? WHERE id=?")->execute([$agendaId,$matriculaId,json_encode($vj,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),$visitaId]);
+                            }
+                        }
+                    }
+                }
+                $pdo->prepare("UPDATE agenda SET alunos=(SELECT COUNT(*) FROM matriculas m WHERE m.agenda_id=agenda.id AND m.status='ativo') WHERE id=?")->execute([$agendaId]);
+                $pdo->commit();
+            } catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
             resposta(['ok'=>true,'ingresso'=>$ingresso]);
 
         case 'delete_matricula':
@@ -2998,6 +3074,9 @@ function scoreTurmaSponte(string $origem,array $ag): int
             $ev=$pdo->prepare("SELECT data_aula FROM mapa_eventos_aula WHERE agenda_id=? AND data_aula BETWEEN ? AND ?");
             $ev->execute([$agendaId,$mes.'-01',$mes.'-31']);
             $semAula=array_fill_keys($ev->fetchAll(PDO::FETCH_COLUMN),true);
+            $fer=$pdo->prepare("SELECT data_aula FROM mapa_feriados_gerais WHERE data_aula BETWEEN ? AND ?");
+            $fer->execute([$mes.'-01',$mes.'-31']);
+            foreach($fer->fetchAll(PDO::FETCH_COLUMN) as $dtFer) $semAula[$dtFer]=true;
             $datas=array_values(array_filter($datas,static fn($dt)=>!isset($semAula[$dt])));
 
             $st=$pdo->prepare("SELECT id,ordem,nome,aulas_previstas FROM agenda_modulos WHERE agenda_id=? ORDER BY ordem,id");
@@ -3168,6 +3247,7 @@ function scoreTurmaSponte(string $origem,array $ag): int
             $st->execute([$agendaId,$turmaId]);
             if(!$st->fetchColumn()) resposta(['ok'=>false,'error'=>'Turma/alocação inválida.'],422);
 
+            if(feriadoGeralNaData($pdo,$dataAula)) resposta(['ok'=>false,'error'=>'Feriado geral nesta data: não é permitido lançar chamada.'],409);
             $ev=$pdo->prepare("SELECT tipo FROM mapa_eventos_aula WHERE agenda_id=? AND data_aula=?");
             $ev->execute([$agendaId,$dataAula]);
             if($ev->fetchColumn()) resposta(['ok'=>false,'error'=>'Esta data está marcada como feriado ou aula cancelada. Remova o evento antes de lançar chamada.'],409);
@@ -3286,6 +3366,7 @@ function scoreTurmaSponte(string $origem,array $ag): int
                     VALUES (?, ?, ?)
                     ON DUPLICATE KEY UPDATE presente = VALUES(presente)
                 ");
+                $presencasGravadas = 0;
                 foreach ($presencas as $p) {
                     $alunoId = (int)($p['alunoId'] ?? 0);
                     if ($alunoId <= 0) continue;
@@ -3294,6 +3375,10 @@ function scoreTurmaSponte(string $origem,array $ag): int
                     if(!$mr || !matriculaElegivelParaModulo($mr,$moduloId>0?$moduloId:null,$dataAula)) continue;
                     $presente = !empty($p['presente']) ? 1 : 0;
                     $up->execute([$chamadaId, $alunoId, $presente]);
+                    $presencasGravadas++;
+                }
+                if ($presencasGravadas === 0) {
+                    throw new RuntimeException('Nenhum aluno da lista estava elegível para esta data e módulo. Chamada não gravada. Confira a data de ingresso e a alocação dos alunos.');
                 }
 
                 $stmt = $pdo->prepare("
@@ -3311,7 +3396,8 @@ function scoreTurmaSponte(string $origem,array $ag): int
                 $pdo->commit();
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
-                throw $e;
+                error_log('[Mapa save_chamada] agendaId='.$agendaId.' turmaId='.$turmaId.' data='.$dataAula.' horario='.$horario.' erro='.$e->getMessage());
+                resposta(['ok'=>false,'error'=>'Não foi possível salvar a chamada: '.$e->getMessage(), 'contexto'=>['agendaId'=>$agendaId,'turmaId'=>$turmaId,'dataAula'=>$dataAula,'horario'=>$horario]],500);
             }
 
             $alunosAfetados = [];
@@ -3342,6 +3428,7 @@ function scoreTurmaSponte(string $origem,array $ag): int
             resposta([
                 'ok' => true,
                 'chamadaId' => $chamadaId,
+                'presencasGravadas' => $presencasGravadas,
                 'moduloId' => $moduloId > 0 ? $moduloId : null,
                 'statusAlocacao' => $progresso['status'] ?? 'andamento',
                 'aulasRealizadas' => (int)($progresso['aulas_realizadas'] ?? 0),
@@ -3900,6 +3987,108 @@ case 'migrar_turma_sala':
             resposta(['ok' => true, 'status' => $status]);
 
 
+        case 'contatos_faltosos':
+            exigirLeituraMapa();
+            $ini=trim((string)($_GET['dataInicio']??date('Y-m-d')));
+            $fim=trim((string)($_GET['dataFim']??$ini));
+            if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$ini)||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$fim)||!checkdate((int)substr($ini,5,2),(int)substr($ini,8,2),(int)substr($ini,0,4))||!checkdate((int)substr($fim,5,2),(int)substr($fim,8,2),(int)substr($fim,0,4))||$ini>$fim) resposta(['ok'=>false,'error'=>'Período inválido.'],422);
+            if(!tabelaExiste($pdo,'mapa_contatos_faltosos')) resposta(['ok'=>false,'error'=>'Instale a migração SQL do acompanhamento de mensagens.'],409);
+            $q=$pdo->prepare("SELECT aluno_id,agenda_id,data_aula,confirmado_em,operador,observacao,status_retorno,atualizado_em FROM mapa_contatos_faltosos WHERE data_aula BETWEEN ? AND ? ORDER BY confirmado_em DESC");
+            $q->execute([$ini,$fim]);
+            resposta(['ok'=>true,'contatos'=>$q->fetchAll(PDO::FETCH_ASSOC)]);
+
+        case 'confirmar_contato_faltoso':
+            liceuRequireMethod('POST');
+            if(!tabelaExiste($pdo,'mapa_contatos_faltosos')) resposta(['ok'=>false,'error'=>'Instale a migração SQL do acompanhamento de mensagens.'],409);
+            $d=corpoJson();$alunoId=(int)($d['alunoId']??0);$agendaId=(int)($d['agendaId']??0);
+            $dataAula=trim((string)($d['dataAula']??''));$confirmar=($d['confirmar']??true)!==false;
+            $obs=trim((string)($d['observacao']??''));
+            if($alunoId<=0||$agendaId<=0||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$dataAula)||!checkdate((int)substr($dataAula,5,2),(int)substr($dataAula,8,2),(int)substr($dataAula,0,4))) resposta(['ok'=>false,'error'=>'Identificação da falta inválida.'],422);
+            if(mb_strlen($obs)>500) resposta(['ok'=>false,'error'=>'Observação muito longa.'],422);
+            // Confirma apenas uma falta efetivamente registrada, não uma chamada pendente.
+            $q=$pdo->prepare("SELECT 1 FROM chamadas c JOIN presencas pr ON pr.chamada_id=c.id JOIN matriculas m ON m.agenda_id=c.agenda_id AND m.aluno_id=pr.aluno_id WHERE c.agenda_id=? AND c.data_aula=? AND pr.aluno_id=? AND pr.presente=0 LIMIT 1");
+            $q->execute([$agendaId,$dataAula,$alunoId]);
+            if(!$q->fetchColumn()) resposta(['ok'=>false,'error'=>'Não existe falta registrada para esse aluno, turma e data. Atualize o acompanhamento.'],409);
+            if($confirmar){
+                $operador=trim((string)($_SESSION['auth_nome']??$_SESSION['auth_username']??'Operador'));
+                $q=$pdo->prepare("INSERT INTO mapa_contatos_faltosos (aluno_id,agenda_id,data_aula,operador,observacao) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE confirmado_em=CURRENT_TIMESTAMP,operador=VALUES(operador),observacao=VALUES(observacao),status_retorno='sem_retorno',atualizado_em=CURRENT_TIMESTAMP");
+                $q->execute([$alunoId,$agendaId,$dataAula,mb_substr($operador,0,150),$obs]);
+            }else{
+                $q=$pdo->prepare("DELETE FROM mapa_contatos_faltosos WHERE aluno_id=? AND agenda_id=? AND data_aula=?");$q->execute([$alunoId,$agendaId,$dataAula]);
+            }
+            resposta(['ok'=>true,'confirmado'=>$confirmar]);
+
+        case 'atualizar_retorno_faltoso':
+            liceuRequireMethod('POST');
+            exigirLeituraMapa();
+            if(!tabelaExiste($pdo,'mapa_contatos_faltosos')) resposta(['ok'=>false,'error'=>'Tabela de contatos não instalada.'],409);
+            $d=corpoJson();
+            $alunoId=(int)($d['alunoId']??0);$agendaId=(int)($d['agendaId']??0);
+            $dataAula=trim((string)($d['dataAula']??''));
+            $status=trim((string)($d['statusRetorno']??'sem_retorno'));
+            $obs=trim((string)($d['observacao']??''));
+            if($alunoId<=0||$agendaId<=0||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$dataAula)||!checkdate((int)substr($dataAula,5,2),(int)substr($dataAula,8,2),(int)substr($dataAula,0,4))) resposta(['ok'=>false,'error'=>'Identificação inválida.'],422);
+            if(!in_array($status,['sem_retorno','pendente_retorno','respondido','resolvido'],true)) resposta(['ok'=>false,'error'=>'Situação inválida.'],422);
+            if(mb_strlen($obs)>500) resposta(['ok'=>false,'error'=>'Observação excede 500 caracteres.'],422);
+            $q=$pdo->prepare('UPDATE mapa_contatos_faltosos SET observacao=?,status_retorno=?,atualizado_em=NOW() WHERE aluno_id=? AND agenda_id=? AND data_aula=?');
+            $q->execute([$obs,$status,$alunoId,$agendaId,$dataAula]);
+            if(!$q->rowCount()){
+                $v=$pdo->prepare('SELECT id FROM mapa_contatos_faltosos WHERE aluno_id=? AND agenda_id=? AND data_aula=?');
+                $v->execute([$alunoId,$agendaId,$dataAula]);
+                if(!$v->fetchColumn()) resposta(['ok'=>false,'error'=>'Confirme primeiro o envio da mensagem.'],409);
+            }
+            resposta(['ok'=>true]);
+
+        case 'novos_visitas':
+            exigirLeituraMapa();
+            // A origem e a data são do Controle de Visitas, nunca da importação Sponte.
+            // Um vínculo efetivado é identificado por visita_matriculas.matricula_id.
+            $sql = "SELECT vm.id vinculo_id, vm.matricula_id, vm.aluno_id, vm.criado_em,
+                           a.nome aluno, a.telefone, t.nome turma, ag.dia, ag.horario,
+                           COALESCE(ag.tipo_curso, 'pago') tipo_curso, vm.tipo_ingresso,
+                           vm.taxa_status, vm.taxa_pago_em, vm.taxa_matricula,
+                           m.status status_matricula, m.status_participacao,
+                           (SELECT MIN(c.data_aula) FROM presencas pr
+                            JOIN chamadas c ON c.id=pr.chamada_id
+                            WHERE pr.aluno_id=vm.aluno_id AND pr.presente=1
+                              AND c.turma_id=m.turma_id
+                              AND c.data_aula >= DATE(vm.criado_em)) primeira_presenca
+                    FROM visita_matriculas vm
+                    JOIN matriculas m ON m.id=vm.matricula_id AND m.aluno_id=vm.aluno_id
+                    JOIN alunos a ON a.id=vm.aluno_id
+                    LEFT JOIN turmas t ON t.id=m.turma_id
+                    LEFT JOIN agenda ag ON ag.id=m.agenda_id
+                    WHERE vm.criado_em >= '2026-08-20 00:00:00'
+                    ORDER BY vm.criado_em DESC, vm.id DESC";
+            $rows=$pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+            $itens=[]; $ids=[];
+            foreach($rows as $r){
+                $mid=(int)$r['matricula_id'];
+                // Evita duplicar matrícula vinculada a mais de uma visita.
+                if(isset($ids[$mid])) continue;
+                $ids[$mid]=true;
+                $status=strtolower(trim((string)$r['status_matricula']));
+                $presenca=!empty($r['primeira_presenca']);
+                $tipoCurso=((string)($r['tipo_curso']??'pago')==='gratuito' || (string)($r['tipo_ingresso']??'')==='gratuito')?'gratuito':'pago';
+                $taxaStatus=strtolower(trim((string)($r['taxa_status']??'')));
+                $taxaPaga=in_array($taxaStatus,['paga','pago','quitada','quitado','isenta','isento'],true) || !empty($r['taxa_pago_em']);
+                // Prioridade: encerramento > presenca real > taxa pendente > nao iniciado.
+                // Aluno que ja compareceu nao deve retroceder para "pendente de taxa".
+                $situacao=in_array($status,['cancelado','cancelada','cancelamento','formado','formada'],true)
+                    ? (str_starts_with($status,'cancel')?'cancelado':'formado')
+                    : ($presenca?'iniciado':($tipoCurso==='pago' && !$taxaPaga?'taxa_pendente':'nao_iniciado'));
+                $itens[]=[
+                    'matriculaId'=>$mid,'alunoId'=>(int)$r['aluno_id'],
+                    'aluno'=>$r['aluno'],'telefone'=>$r['telefone'],
+                    'turma'=>$r['turma']?:'Sem turma','dia'=>$r['dia'],'horario'=>$r['horario'],
+                    'entrada'=>substr((string)$r['criado_em'],0,10),
+                    'primeiraPresenca'=>$r['primeira_presenca']?:null,
+                    'statusMatricula'=>$status,'situacao'=>$situacao,
+                    'tipoCurso'=>$tipoCurso,'taxaStatus'=>$taxaStatus,'taxaPaga'=>$taxaPaga
+                ];
+            }
+            resposta(['ok'=>true,'inicioCorte'=>'2026-08-20','itens'=>$itens]);
+
         case 'acompanhamento_dia':
             exigirLeituraMapa();
             $dataAula = trim((string)($_GET['dataAula'] ?? date('Y-m-d')));
@@ -3907,6 +4096,11 @@ case 'migrar_turma_sala':
             try{$dt=new DateTimeImmutable($dataAula);}catch(Throwable $e){resposta(['ok'=>false,'error'=>'Data inválida.'],422);}
             $diasSemana=[0=>'Domingo',1=>'Segunda',2=>'Terça',3=>'Quarta',4=>'Quinta',5=>'Sexta',6=>'Sábado'];
             $dia=$diasSemana[(int)$dt->format('w')]??'';
+            $feriado=feriadoGeralNaData($pdo,$dataAula);
+            if($feriado){
+                $zero=['previstos'=>0,'presentes'=>0,'faltantes'=>0,'pendentes'=>0];
+                resposta(['ok'=>true,'dia'=>$dia,'dataAula'=>$dataAula,'feriado'=>$feriado,'previstos'=>0,'presentes'=>0,'faltantes'=>0,'pendentes'=>0,'porTipo'=>['pago'=>$zero,'gratuito'=>$zero],'alunos'=>[]]);
+            }
 
             $stmt=$pdo->prepare("\n                SELECT ag.id agenda_id,ag.horario,ag.sala_id,ag.status agenda_status,ag.data_inicio agenda_data_inicio,ag.tipo_curso,\n                       t.id turma_id,t.nome turma_nome,p.nome professor_nome,\n                       m.status_participacao,m.data_matricula,m.data_inicio_participacao,m.modulo_ingresso_id,m.agenda_modulo_ingresso_id,\n                       a.id aluno_id,a.nome aluno_nome,a.telefone,a.manual_status,a.ultima_presenca,a.historico_anterior,\n                       c.id chamada_id,pr.presente\n                FROM agenda ag\n                JOIN turmas t ON t.id=ag.turma_id\n                JOIN professores p ON p.id=t.prof_id\n                JOIN matriculas m ON m.agenda_id=ag.id AND m.status='ativo'\n                JOIN alunos a ON a.id=m.aluno_id\n                LEFT JOIN chamadas c ON c.agenda_id=ag.id AND c.data_aula=?\n                LEFT JOIN presencas pr ON pr.chamada_id=c.id AND pr.aluno_id=a.id\n                WHERE ag.dia=?\n                ORDER BY ag.tipo_curso,ag.horario,t.nome,a.nome\n            ");
             $stmt->execute([$dataAula,$dia]);$rows=$stmt->fetchAll();
@@ -3925,6 +4119,11 @@ case 'migrar_turma_sala':
                     : ((string)$r['agenda_status']!=='iniciar');
                 if(!$agendaIniciada) continue;
                 $aid=(int)$r['agenda_id'];
+                if(!isset($eventosBloqueados)){
+                    $stEv=$pdo->prepare("SELECT agenda_id FROM mapa_eventos_aula WHERE data_aula=?");$stEv->execute([$dataAula]);
+                    $eventosBloqueados=array_fill_keys($stEv->fetchAll(PDO::FETCH_COLUMN),true);
+                }
+                if(isset($eventosBloqueados[$aid])) continue;
                 if(!array_key_exists($aid,$modCache)){
                     $m=moduloAtualDaAgenda($pdo,(int)$r['turma_id'],$aid);$modCache[$aid]=$m?$m['id']:null;
                 }
@@ -3966,16 +4165,23 @@ case 'migrar_turma_sala':
                   WHERE ag.dia=?
                   ORDER BY ag.tipo_curso,ag.horario,t.nome,a.nome";
             $q=$pdo->prepare($sql);$lista=[];$previstos=0;$presentes=0;$faltantes=0;$pendentes=0;$modCache=[];
+            $feriadosPeriodo=[];
+            $stFeriados=$pdo->prepare("SELECT data_aula,observacao FROM mapa_feriados_gerais WHERE data_aula BETWEEN ? AND ? ORDER BY data_aula");
+            $stFeriados->execute([$dataInicio,$dataFim]);
+            foreach($stFeriados->fetchAll(PDO::FETCH_ASSOC) as $f) $feriadosPeriodo[$f['data_aula']]=$f;
             $porTipo=['pago'=>['previstos'=>0,'presentes'=>0,'faltantes'=>0,'pendentes'=>0],'gratuito'=>['previstos'=>0,'presentes'=>0,'faltantes'=>0,'pendentes'=>0]];
             for($dt=$ini;$dt<=$fim;$dt=$dt->modify('+1 day')){
                 $dataAula=$dt->format('Y-m-d');$dia=$diasSemana[(int)$dt->format('w')]??'';
+                if(isset($feriadosPeriodo[$dataAula])) continue;
+                $stEv=$pdo->prepare("SELECT agenda_id FROM mapa_eventos_aula WHERE data_aula=?");$stEv->execute([$dataAula]);
+                $bloqueadas=array_fill_keys($stEv->fetchAll(PDO::FETCH_COLUMN),true);
                 $q->execute([$dataAula,$dia]);
                 foreach($q->fetchAll() as $r){
                     $agendaIniciada=!empty($r['agenda_data_inicio'])
                         ? (substr((string)$r['agenda_data_inicio'],0,10) <= $dataAula)
                         : ((string)$r['agenda_status']!=='iniciar');
                     if(!$agendaIniciada) continue;
-                    $aid=(int)$r['agenda_id'];$cacheKey=$aid.'|'.$dataAula;
+                    $aid=(int)$r['agenda_id'];if(isset($bloqueadas[$aid])) continue;$cacheKey=$aid.'|'.$dataAula;
                     if(!array_key_exists($cacheKey,$modCache)){$m=moduloAtualDaAgenda($pdo,(int)$r['turma_id'],$aid);$modCache[$cacheKey]=$m?$m['id']:null;}
                     if(!matriculaElegivelParaModulo($r,$modCache[$cacheKey],$dataAula)) continue;
                     $tipo=((string)($r['tipo_curso']??'pago'))==='gratuito'?'gratuito':'pago';
@@ -3985,103 +4191,144 @@ case 'migrar_turma_sala':
                     $lista[]=['dataAula'=>$dataAula,'dia'=>$dia,'agendaId'=>$aid,'horario'=>$r['horario'],'salaId'=>$r['sala_id'],'turmaId'=>(int)$r['turma_id'],'turma'=>$r['turma_nome'],'professor'=>$r['professor_nome'],'alunoId'=>(int)$r['aluno_id'],'aluno'=>$r['aluno_nome'],'telefone'=>$r['telefone'],'tipoCurso'=>$tipo,'statusAluno'=>$statusParticipacao==='aguardando_inicio'?'aguardando_inicio':statusAlunoCalculado($r['manual_status'],$r['ultima_presenca'],(int)$r['historico_anterior']),'situacaoChamada'=>$situacao];
                 }
             }
-            resposta(['ok'=>true,'dataInicio'=>$dataInicio,'dataFim'=>$dataFim,'previstos'=>$previstos,'presentes'=>$presentes,'faltantes'=>$faltantes,'pendentes'=>$pendentes,'porTipo'=>$porTipo,'alunos'=>$lista]);
+            resposta(['ok'=>true,'dataInicio'=>$dataInicio,'dataFim'=>$dataFim,'feriados'=>array_values($feriadosPeriodo),'previstos'=>$previstos,'presentes'=>$presentes,'faltantes'=>$faltantes,'pendentes'=>$pendentes,'porTipo'=>$porTipo,'alunos'=>$lista]);
 
         case 'acompanhamento_geral':
             exigirLeituraMapa();
-            $dataLimite = trim((string)($_GET['dataLimite'] ?? date('Y-m-d')));
-            if ($dataLimite === '') $dataLimite = date('Y-m-d');
+            // Fechamento mensal: cada aluno conta uma vez, independentemente de quantas aulas frequentou.
+            $mes = trim((string)($_GET['mes'] ?? date('Y-m')));
+            if (!preg_match('/^(20[0-9]{2})-(0[1-9]|1[0-2])$/', $mes)) {
+                resposta(['ok'=>false,'error'=>'Mês inválido.'], 400);
+            }
+            $inicio = $mes . '-01';
+            $fimExclusivo = date('Y-m-d', strtotime($inicio . ' +1 month'));
+            $fim = date('Y-m-d', strtotime($fimExclusivo . ' -1 day'));
+            $hoje = date('Y-m-d');
+            $limite = min($fim, $hoje);
+            $tipo = trim((string)($_GET['tipoCurso'] ?? 'todos'));
+            if (!in_array($tipo, ['todos','pago','gratuito'], true)) $tipo='todos';
 
-            // Uma linha por matrícula/alocação ativa.
-            $stmt = $pdo->prepare("
-                SELECT
-                    m.agenda_id,
-                    a.id AS aluno_id,
-                    a.nome AS aluno_nome,
-                    a.telefone,
-                    a.manual_status,
-                    a.ultima_presenca,
-                    a.historico_anterior,
-                    ag.horario,
-                    t.nome AS turma_nome,
-                    p.nome AS professor_nome
+            // Base: alunos com matrícula válida durante o mês. Não inclui matrículas futuras
+            // nem as encerradas antes do mês. Uma pessoa pode ter múltiplas alocações.
+            $st = $pdo->prepare("
+                SELECT m.aluno_id, a.nome aluno_nome, a.telefone, t.nome turma_nome,
+                       ag.tipo_curso, ag.horario
                 FROM matriculas m
-                INNER JOIN alunos a ON a.id = m.aluno_id
-                INNER JOIN agenda ag ON ag.id = m.agenda_id
-                INNER JOIN turmas t ON t.id = ag.turma_id
-                INNER JOIN professores p ON p.id = t.prof_id
-                WHERE m.status = 'ativo'
-                ORDER BY a.nome, t.nome, ag.horario
+                JOIN alunos a ON a.id=m.aluno_id
+                JOIN agenda ag ON ag.id=m.agenda_id
+                JOIN turmas t ON t.id=ag.turma_id
+                WHERE (m.data_matricula IS NULL OR m.data_matricula='' OR
+                       m.data_matricula='CURRENT_DATE' OR
+                       (m.data_matricula REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' AND m.data_matricula < ?))
+                  AND (m.status='ativo' OR
+                       (m.data_saida REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' AND m.data_saida >= ?))
+                ORDER BY a.nome, t.nome
             ");
-            $stmt->execute();
-            $rows = $stmt->fetchAll();
+            $st->execute([$fimExclusivo, $inicio]);
+            $matriculas=$st->fetchAll();
 
-            // Faltas acumuladas até a data limite.
-            $stmtFaltas = $pdo->prepare("
-                SELECT
-                    p.aluno_id,
-                    COUNT(*) AS qtd_faltas,
-                    MAX(c.data_aula) AS ultima_falta
-                FROM presencas p
-                INNER JOIN chamadas c ON c.id = p.chamada_id
-                WHERE p.presente = 0
-                  AND c.data_aula <= ?
+            // Presenças efetivas no mês, com DISTINCT por aluno (e não por chamada).
+            $st=$pdo->prepare("
+                SELECT p.aluno_id,
+                    MAX(CASE WHEN p.presente=1 THEN c.data_aula ELSE NULL END) ultima_presenca,
+                    COUNT(DISTINCT CASE WHEN p.presente=1 THEN c.id ELSE NULL END) aulas_presentes,
+                    COUNT(DISTINCT CASE WHEN p.presente=0 THEN c.id ELSE NULL END) faltas,
+                    MAX(CASE WHEN p.presente=0 THEN c.data_aula ELSE NULL END) ultima_falta
+                FROM presencas p JOIN chamadas c ON c.id=p.chamada_id
+                WHERE c.data_aula >= ? AND c.data_aula <= ?
                 GROUP BY p.aluno_id
             ");
-            $stmtFaltas->execute([$dataLimite]);
-            $faltasMap = [];
-            foreach ($stmtFaltas->fetchAll() as $f) {
-                $faltasMap[(int)$f['aluno_id']] = [
-                    'qtd' => (int)$f['qtd_faltas'],
-                    'ultima' => $f['ultima_falta']
+            $st->execute([$inicio,$limite]);
+            $frequencia=[];
+            foreach($st->fetchAll() as $p) $frequencia[(int)$p['aluno_id']]=$p;
+
+            // Identifica alunos sem qualquer presença até o encerramento do período.
+            $st=$pdo->prepare("
+                SELECT DISTINCT p.aluno_id FROM presencas p
+                JOIN chamadas c ON c.id=p.chamada_id
+                WHERE p.presente=1 AND c.data_aula <= ?
+            ");
+            $st->execute([$limite]);
+            $historico=[];
+            foreach($st->fetchAll(PDO::FETCH_COLUMN) as $id) $historico[(int)$id]=true;
+
+            $lista=[]; $vistos=[];
+            foreach($matriculas as $m){
+                $curso=((string)$m['tipo_curso']==='gratuito')?'gratuito':'pago';
+                if($tipo!=='todos' && $curso!==$tipo) continue;
+                $id=(int)$m['aluno_id'];
+                if(isset($vistos[$id])) continue;
+                $vistos[$id]=true;
+                $f=$frequencia[$id]??[];
+                $presentes=(int)($f['aulas_presentes']??0);
+                $nunca=!isset($historico[$id]);
+                $status=$presentes>0?'ativo':($nunca?'nao_iniciado':'desaparecido');
+                $lista[]=[
+                    'alunoId'=>$id,'tipoCurso'=>$curso,'aluno'=>$m['aluno_nome'],
+                    'telefone'=>$m['telefone'],'turma'=>$m['turma_nome'],'horario'=>$m['horario'],
+                    'statusAluno'=>$status,'ultimaPresenca'=>$f['ultima_presenca']??null,
+                    'qtdPresencas'=>$presentes,'qtdFaltas'=>(int)($f['faltas']??0),
+                    'ultimaFalta'=>$f['ultima_falta']??null,'nuncaCompareceu'=>$nunca
                 ];
             }
-
-            $lista = [];
-            $vistos = [];
-            $ativos = 0;
-            $naoIniciados = 0;
-            $desaparecidos = 0;
-            $faltosos = 0;
-
-            foreach ($rows as $r) {
-                $alunoId = (int)$r['aluno_id'];
-
-                // Evita contar o mesmo aluno duas vezes se estiver em mais de uma alocação ativa.
-                if (isset($vistos[$alunoId])) continue;
-                $vistos[$alunoId] = true;
-
-                $status = statusAlunoCalculado($r['manual_status'], $r['ultima_presenca'], (int)$r['historico_anterior']);
-                $faltas = $faltasMap[$alunoId] ?? ['qtd' => 0, 'ultima' => null];
-
-                if ($status === 'ativo') $ativos++;
-                if ($status === 'nao_iniciado') $naoIniciados++;
-                if ($status === 'desaparecido') $desaparecidos++;
-                if ($faltas['qtd'] > 0) $faltosos++;
-
-                $lista[] = [
-                    'alunoId' => $alunoId,
-                    'aluno' => $r['aluno_nome'],
-                    'telefone' => $r['telefone'],
-                    'statusAluno' => $status,
-                    'ultimaPresenca' => $r['ultima_presenca'],
-                    'qtdFaltas' => (int)$faltas['qtd'],
-                    'ultimaFalta' => $faltas['ultima'],
-                    'turma' => $r['turma_nome'],
-                    'professor' => $r['professor_nome'],
-                    'horario' => $r['horario'],
-                ];
+            // Encerramentos do mes: uma falha nesta consulta auxiliar nao deve
+            // impedir a exibicao da frequencia mensal inteira.
+            $formadosMes=0;
+            $canceladosMes=0;
+            $formadosLista=[];
+            $canceladosLista=[];
+            try {
+                // Datas armazenadas como texto no legado; compara apenas datas ISO validas.
+                // Evita DATE() sobre textos invalidos e nao altera registros historicos.
+                $sqlEncerramentos = "
+                    SELECT m.aluno_id, m.status, m.motivo_saida, a.nome AS aluno_nome, t.nome AS turma_nome,
+                           CASE WHEN m.status='formado'
+                                THEN COALESCE(NULLIF(LEFT(TRIM(m.data_formatura),10),''), LEFT(TRIM(m.data_saida),10))
+                                ELSE LEFT(TRIM(m.data_saida),10)
+                           END AS data_evento
+                    FROM matriculas m
+                    INNER JOIN alunos a ON a.id=m.aluno_id
+                    LEFT JOIN turmas t ON t.id=m.turma_id
+                    LEFT JOIN agenda ag ON ag.id=m.agenda_id
+                    WHERE m.status IN ('formado','cancelado')
+                      AND (?='todos' OR (CASE WHEN ag.tipo_curso='gratuito' THEN 'gratuito' ELSE 'pago' END)=?)
+                ";
+                $stEnc=$pdo->prepare($sqlEncerramentos);
+                $stEnc->execute([$tipo,$tipo]);
+                $encerramentos=['formado'=>[],'cancelado'=>[]];
+                foreach($stEnc->fetchAll(PDO::FETCH_ASSOC) as $enc){
+                    $dataEvento=(string)($enc['data_evento']??'');
+                    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataEvento)) continue;
+                    if ($dataEvento < $inicio || $dataEvento >= $fimExclusivo) continue;
+                    $categoria=$enc['status'];
+                    $idAluno=(int)$enc['aluno_id'];
+                    if (!isset($encerramentos[$categoria][$idAluno])) {
+                        $registro=['alunoId'=>$idAluno,'aluno'=>$enc['aluno_nome'],
+                            'turma'=>$enc['turma_nome']??'—','data'=>$dataEvento,
+                            'motivo'=>trim((string)($enc['motivo_saida']??''))];
+                        if ($categoria==='formado') $formadosLista[]=$registro;
+                        else $canceladosLista[]=$registro;
+                    }
+                    $encerramentos[$categoria][$idAluno]=true;
+                }
+                $formadosMes=count($encerramentos['formado']);
+                $canceladosMes=count($encerramentos['cancelado']);
+            } catch (Throwable $erroEncerramentos) {
+                error_log('[Mapa acompanhamento_geral encerramentos] '.$erroEncerramentos->getMessage());
             }
 
+            $compareceram=count(array_filter($lista,fn($a)=>$a['qtdPresencas']>0));
+            $naoCompareceram=count($lista)-$compareceram;
+            $nuncaCompareceram=count(array_filter($lista,fn($a)=>$a['nuncaCompareceu']));
             resposta([
-                'ok' => true,
-                'dataLimite' => $dataLimite,
-                'total' => count($lista),
-                'ativos' => $ativos,
-                'naoIniciados' => $naoIniciados,
-                'desaparecidos' => $desaparecidos,
-                'faltosos' => $faltosos,
-                'alunos' => $lista,
+                'ok'=>true,'mes'=>$mes,'tipoCurso'=>$tipo,'total'=>count($lista),
+                'ativos'=>$compareceram,'desaparecidos'=>$naoCompareceram,
+                'naoIniciados'=>$nuncaCompareceram,
+                'faltosos'=>count(array_filter($lista,fn($a)=>$a['qtdFaltas']>0)),
+                'formadosMes'=>$formadosMes,'canceladosMes'=>$canceladosMes,
+                'formadosLista'=>$formadosLista,'canceladosLista'=>$canceladosLista,
+                'taxa'=>count($lista)?round(100*$compareceram/count($lista),1):0,
+                'alunos'=>$lista
             ]);
 
 
@@ -4484,48 +4731,59 @@ case 'migrar_turma_sala':
             $d=corpoJson();
             $matriculaId=(int)($d['matriculaId']??0);
             if($matriculaId<=0) resposta(['ok'=>false,'error'=>'Matrícula inválida.'],422);
-            $st=$pdo->prepare("SELECT m.id,m.aluno_id FROM matriculas m WHERE m.id=? LIMIT 1");$st->execute([$matriculaId]);
-            $matriculaRow=$st->fetch();
+            $st=$pdo->prepare("SELECT m.id,m.aluno_id,a.nome FROM matriculas m JOIN alunos a ON a.id=m.aluno_id WHERE m.id=? LIMIT 1");
+            $st->execute([$matriculaId]);$matriculaRow=$st->fetch();
             if(!$matriculaRow) resposta(['ok'=>false,'error'=>'Matrícula não encontrada.'],404);
-            $alunoNome=trim((string)($d['alunoNome']??''));
-            if($alunoNome==='') resposta(['ok'=>false,'error'=>'Informe o nome do aluno.'],422);
-            if(mb_strlen($alunoNome,'UTF-8')>180) resposta(['ok'=>false,'error'=>'Nome do aluno muito longo.'],422);
-            $duracaoFinanceira=isset($d['duracaoFinanceiraMeses']) && $d['duracaoFinanceiraMeses']!==''?(int)$d['duracaoFinanceiraMeses']:null;
-            if($duracaoFinanceira!==null && ($duracaoFinanceira<1 || $duracaoFinanceira>60)) resposta(['ok'=>false,'error'=>'Duração financeira deve estar entre 1 e 60 meses.'],422);
-            $duracaoPedagogica=isset($d['duracaoPedagogicaMeses']) && $d['duracaoPedagogicaMeses']!==''?(int)$d['duracaoPedagogicaMeses']:null;
-            if($duracaoPedagogica!==null && ($duracaoPedagogica<1 || $duracaoPedagogica>60)) resposta(['ok'=>false,'error'=>'Duração pedagógica deve estar entre 1 e 60 meses.'],422);
-            $inicio=trim((string)($d['dataInicioPedagogica']??''));
-            if($inicio!=='' && !preg_match('/^\d{4}-\d{2}-\d{2}$/',$inicio)) resposta(['ok'=>false,'error'=>'Data de início pedagógica inválida.'],422);
-            $inicioFinanceiro=trim((string)($d['dataInicioFinanceira']??''));
-            if($inicioFinanceiro!=='' && !preg_match('/^\d{4}-\d{2}-\d{2}$/',$inicioFinanceiro)) resposta(['ok'=>false,'error'=>'Data de início financeiro inválida.'],422);
-            $ultimaParcela=trim((string)($d['dataUltimaParcelaFinanceira']??''));
-            if($ultimaParcela!=='' && !preg_match('/^\d{4}-\d{2}-\d{2}$/',$ultimaParcela)) resposta(['ok'=>false,'error'=>'Data da última parcela inválida.'],422);
-            $ultimoPagamentoManual=trim((string)($d['ultimoPagamentoManual']??''));
-            if($ultimoPagamentoManual!=='' && !preg_match('/^\d{4}-\d{2}-\d{2}$/',$ultimoPagamentoManual)) resposta(['ok'=>false,'error'=>'Data do último pagamento manual inválida.'],422);
-            $fin=trim((string)($d['financeiroStatus']??'nao_informado'));
-            if(!in_array($fin,['nao_informado','em_dia','inadimplente','quitado','sem_financeiro'],true)) resposta(['ok'=>false,'error'=>'Status financeiro inválido.'],422);
-            $meses=max(0,min(60,(int)($d['mesesInadimplencia']??0)));
-            if($fin!=='inadimplente') $meses=0;
-            $obs=trim((string)($d['financeiroObservacoes']??''));
-            $stmt=$pdo->prepare("
-                INSERT INTO matricula_gestao(matricula_id,duracao_manual_meses,duracao_pedagogica_manual_meses,data_inicio_contrato_manual,data_inicio_financeiro_manual,data_ultima_parcela_manual,ultimo_pagamento_manual,financeiro_status,meses_inadimplencia,financeiro_observacoes,financeiro_fonte,atualizado_em)
-                VALUES(?,?,?,?,?,?,?,?,?,?,'manual',CURRENT_TIMESTAMP)
-                ON DUPLICATE KEY UPDATE
-                    duracao_manual_meses=VALUES(duracao_manual_meses),
-                    duracao_pedagogica_manual_meses=VALUES(duracao_pedagogica_manual_meses),
-                    data_inicio_contrato_manual=VALUES(data_inicio_contrato_manual),
-                    data_inicio_financeiro_manual=VALUES(data_inicio_financeiro_manual),
-                    data_ultima_parcela_manual=VALUES(data_ultima_parcela_manual),
-                    ultimo_pagamento_manual=VALUES(ultimo_pagamento_manual),
-                    financeiro_status=VALUES(financeiro_status),
-                    meses_inadimplencia=VALUES(meses_inadimplencia),
-                    financeiro_observacoes=VALUES(financeiro_observacoes),
-                    financeiro_fonte='manual',
-                    atualizado_em=CURRENT_TIMESTAMP
-            ");
-            $stmt->execute([$matriculaId,$duracaoFinanceira,$duracaoPedagogica,$inicio?:null,$inicioFinanceiro?:null,$ultimaParcela?:null,$ultimoPagamentoManual?:null,$fin,$meses,$obs?:null]);
-            $pdo->prepare("UPDATE alunos SET nome=? WHERE id=?")->execute([$alunoNome,(int)$matriculaRow['aluno_id']]);
-            resposta(['ok'=>true,'alunoNome'=>$alunoNome]);
+            // PATCH: somente campos presentes no JSON sao alterados. Campos omitidos nunca viram NULL.
+            $campos=[
+                'duracaoFinanceiraMeses'=>['duracao_manual_meses','int'],
+                'duracaoPedagogicaMeses'=>['duracao_pedagogica_manual_meses','int'],
+                'dataInicioPedagogica'=>['data_inicio_contrato_manual','date'],
+                'dataInicioFinanceira'=>['data_inicio_financeiro_manual','date'],
+                'dataUltimaParcelaFinanceira'=>['data_ultima_parcela_manual','date'],
+                'ultimoPagamentoManual'=>['ultimo_pagamento_manual','date'],
+                'financeiroStatus'=>['financeiro_status','status'],
+                'mesesInadimplencia'=>['meses_inadimplencia','meses'],
+                'financeiroObservacoes'=>['financeiro_observacoes','text'],
+            ];
+            $updates=[];$params=[];
+            foreach($campos as $chave=>$cfg){
+                if(!array_key_exists($chave,$d)) continue;
+                [$col,$tipo]=$cfg;$v=$d[$chave];
+                if($tipo==='int'){
+                    $v=($v===null || $v==='')?null:(int)$v;
+                    if($v!==null && ($v<1 || $v>60)) resposta(['ok'=>false,'error'=>'Duração deve estar entre 1 e 60 meses.'],422);
+                }elseif($tipo==='date'){
+                    $v=($v===null || trim((string)$v)==='')?null:trim((string)$v);
+                    if($v!==null && !preg_match('/^\d{4}-\d{2}-\d{2}$/',$v)) resposta(['ok'=>false,'error'=>'Data inválida: '.$chave],422);
+                }elseif($tipo==='status'){
+                    $v=trim((string)$v);
+                    if(!in_array($v,['nao_informado','em_dia','inadimplente','quitado','sem_financeiro'],true)) resposta(['ok'=>false,'error'=>'Status financeiro inválido.'],422);
+                }elseif($tipo==='meses'){
+                    $v=(int)$v;if($v<0 || $v>60) resposta(['ok'=>false,'error'=>'Meses de inadimplência inválidos.'],422);
+                }else{$v=$v===null?null:trim((string)$v);}
+                $updates[]="$col=?";$params[]=$v;
+            }
+            if(array_key_exists('financeiroStatus',$d) && $d['financeiroStatus']!=='inadimplente' && !array_key_exists('mesesInadimplencia',$d)){
+                $updates[]='meses_inadimplencia=?';$params[]=0;
+            }
+            $pdo->beginTransaction();
+            try{
+                if($updates){
+                    // Insere somente o identificador na primeira edição, preservando defaults das demais colunas.
+                    $pdo->prepare('INSERT INTO matricula_gestao(matricula_id) VALUES(?) ON DUPLICATE KEY UPDATE matricula_id=matricula_id')->execute([$matriculaId]);
+                    $updates[]="financeiro_fonte='manual'";$updates[]='atualizado_em=CURRENT_TIMESTAMP';
+                    $params[]=$matriculaId;
+                    $pdo->prepare('UPDATE matricula_gestao SET '.implode(',',$updates).' WHERE matricula_id=?')->execute($params);
+                }
+                if(array_key_exists('alunoNome',$d)){
+                    $nome=trim((string)$d['alunoNome']);
+                    if($nome==='' || mb_strlen($nome,'UTF-8')>180) throw new InvalidArgumentException('Nome do aluno inválido.');
+                    if($nome!==$matriculaRow['nome']) $pdo->prepare('UPDATE alunos SET nome=? WHERE id=?')->execute([$nome,(int)$matriculaRow['aluno_id']]);
+                }
+                $pdo->commit();
+            }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+            resposta(['ok'=>true,'alunoNome'=>$d['alunoNome']??$matriculaRow['nome']]);
 
         case 'bloquear_por_inadimplencia':
             exigirAdmin();

@@ -2481,6 +2481,20 @@ $__visRole=authRole();
         @media(max-width:760px){.daily-day-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.daily-day-kpi{border-bottom:1px solid #edf1f5}}
 </style>
 <!-- LICEU VISITAS BUILD V3.1.3.2.2 LOGO SIDEBAR -->
+<style id="cq-toolbar-layout-fix">
+.cq-toolbar-clean{display:flex;flex-direction:column;gap:14px;padding:4px 0 12px}
+.cq-toolbar-heading strong{font-size:.88rem;color:var(--primary,#073c80)}
+.cq-filters-clean{display:grid;grid-template-columns:minmax(300px,1.7fr) repeat(4,minmax(140px,1fr));gap:10px;align-items:end}
+.cq-period,.cq-filter-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.cq-period label,.cq-filter-field label{font-size:.73rem;font-weight:700;color:#657d97}
+.cq-period-fields{display:flex;align-items:center;gap:7px;min-width:0}
+.cq-period-fields input{flex:1;min-width:0;width:0}
+.cq-period-fields span{font-size:.75rem;color:#657d97;flex:none}
+.cq-filters-clean .form-control{width:100%;min-width:0;height:39px;font-size:.82rem}
+.cq-toolbar-buttons{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+@media(max-width:1150px){.cq-filters-clean{grid-template-columns:repeat(2,minmax(0,1fr))}.cq-period{grid-column:span 2}}
+@media(max-width:600px){.cq-filters-clean{grid-template-columns:1fr}.cq-period{grid-column:span 1}.cq-toolbar-buttons .btn{flex:1}}
+</style>
 </head>
 <body>
     <div id="systemLoading" class="system-loading">
@@ -3061,7 +3075,19 @@ $__visRole=authRole();
             </section>
 
 
-            <section id="qualidade-contratos" class="content-section hidden"><div class="section"><div class="section-toolbar"><div class="toolbar-copy"><strong>Contratos / Controle de Qualidade</strong><div style="margin-top:4px;color:var(--gray);font-size:.78rem">Acompanhe taxas, documentos e pendências dos contratos de matrícula paga.</div></div><div class="toolbar-actions" style="display:flex;gap:8px;flex-wrap:wrap"><select id="cqFiltro" class="form-control" style="width:180px" onchange="renderPainelCQ()"><option value="pendencias">Pendências</option><option value="taxa">Taxa pendente</option><option value="documentos">Documentos</option><option value="nao_revisado">Não revisados</option><option value="aprovado">Aprovados</option><option value="iniciou">Já iniciaram</option><option value="nao_iniciou">Não iniciaram</option><option value="todos">Todos</option></select><button class="btn btn-primary btn-sm" onclick="carregarPainelCQ()"><i class="fas fa-rotate"></i> Atualizar</button></div></div></div><div class="cq-kpis" id="cqKpis"></div><div class="section"><div class="table-container"><table class="data-table"><thead><tr><th>Data</th><th>Aluno</th><th>Vendedor</th><th>Qualidade</th><th>Taxa</th><th>Documentos</th><th>Início</th><th>Próximo prazo</th><th>Ações</th></tr></thead><tbody id="cqTabela"><tr><td colspan="9" style="text-align:center;color:var(--gray)">Carregando...</td></tr></tbody></table></div></div></section>
+            <section id="qualidade-contratos" class="content-section hidden">
+              <div class="section"><div class="cq-toolbar-clean">
+<div class="cq-toolbar-heading"><strong>Contratos / Controle de Qualidade</strong><div style="margin-top:4px;color:var(--gray);font-size:.78rem">Matrículas pagas, pagamentos, início das aulas e comissionamento.</div></div>
+<div class="cq-filters-clean">
+<div class="cq-period"><label for="cqComissaoInicio">Período da matrícula</label><div class="cq-period-fields"><input id="cqComissaoInicio" type="date" class="form-control" aria-label="Data inicial" onchange="renderPainelCQ()"><span>até</span><input id="cqComissaoFim" type="date" class="form-control" aria-label="Data final" onchange="renderPainelCQ()"></div></div>
+<div class="cq-filter-field"><label for="cqSituacao">Pagamento</label><select id="cqSituacao" class="form-control" onchange="renderPainelCQ()"><option value="todos">Todos</option><option value="completo">Taxa + 1ª pagas</option><option value="primeira">Falta 1ª mensalidade</option><option value="nenhum">Taxa e 1ª pendentes</option><option value="outros">Outras situações</option></select></div>
+<div class="cq-filter-field"><label for="cqInicio">Início das aulas</label><select id="cqInicio" class="form-control" onchange="renderPainelCQ()"><option value="todos">Todos</option><option value="iniciou">Iniciados</option><option value="nao_iniciou">Não iniciados</option></select></div>
+<div class="cq-filter-field"><label for="cqComissaoFiltro">Comissão</label><select id="cqComissaoFiltro" class="form-control" onchange="renderPainelCQ()"><option value="todos">Todos</option><option value="enviado">Enviados</option><option value="nao_enviado">Não enviados</option></select></div>
+<div class="cq-filter-field"><label for="cqFiltro">Qualidade</label><select id="cqFiltro" class="form-control" onchange="renderPainelCQ()"><option value="todos">Todos</option><option value="pendencias">Com pendências</option><option value="taxa">Taxa pendente</option><option value="documentos">Documentos pendentes</option><option value="nao_revisado">Não revisados</option><option value="aprovado">Aprovados</option></select></div>
+</div><div class="cq-toolbar-buttons"><button class="btn btn-success btn-sm" onclick="exportarComissaoCQ()"><i class="fas fa-file-excel"></i> Exportar comissão pendente</button><button class="btn btn-primary btn-sm" onclick="carregarPainelCQ()"><i class="fas fa-rotate"></i> Atualizar</button></div>
+</div></div>
+              <div class="cq-kpis" id="cqKpis"></div><div class="section"><div id="cqContagem" style="font-size:.8rem;color:var(--gray);margin-bottom:10px"></div><div class="table-container"><table class="data-table"><thead><tr><th>Data</th><th>Aluno</th><th>Vendedor</th><th>Taxa</th><th>1ª mensalidade</th><th>Início</th><th>Qualidade</th><th>Comissão</th><th>Ações</th></tr></thead><tbody id="cqTabela"><tr><td colspan="9" style="text-align:center;color:var(--gray)">Carregando...</td></tr></tbody></table></div></div>
+            </section>
 
         </main>
     </div>
@@ -7922,8 +7948,70 @@ body{
         }
 
         let cqPainelCache=[],cqDigitalAtual=null;
-        async function carregarPainelCQ(){if(!exigirVisOperadorFront())return;const tbody=document.getElementById('cqTabela');if(tbody)tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:24px">Carregando contratos...</td></tr>';try{const r=await apiVisitasGet('cq_painel');cqPainelCache=r.itens||[];renderPainelCQ();}catch(e){if(tbody)tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--danger);padding:24px">${e.message}</td></tr>`;}}
-        function renderPainelCQ(){const filtro=document.getElementById('cqFiltro')?.value||'pendencias';const lista=(cqPainelCache||[]).filter(x=>filtro==='todos'||(filtro==='aprovado'&&x.status==='aprovado')||(filtro==='nao_revisado'&&x.status==='nao_revisado')||(filtro==='taxa'&&x.taxasPendentes>0)||(filtro==='documentos'&&x.documentosPendentes>0)||(filtro==='iniciou'&&x.inicioStatus==='iniciou')||(filtro==='nao_iniciou'&&x.inicioStatus!=='iniciou')||(filtro==='pendencias'&&(x.status!=='aprovado'||x.taxasPendentes>0||x.documentosPendentes>0||x.financeiroStatus!=='aprovado')));const iniciados=(cqPainelCache||[]).filter(x=>x.inicioStatus==='iniciou').length;const k=document.getElementById('cqKpis');if(k)k.innerHTML=`<div class="cq-kpi"><strong>${cqPainelCache.length}</strong><span>Contratos acompanhados</span></div><div class="cq-kpi"><strong>${iniciados}</strong><span>Já iniciaram</span></div><div class="cq-kpi"><strong>${cqPainelCache.filter(x=>x.taxasPendentes>0).length}</strong><span>Com taxa pendente</span></div><div class="cq-kpi"><strong>${cqPainelCache.filter(x=>x.financeiroStatus==='aprovado').length}</strong><span>Validados pelo Financeiro</span></div>`;const tbody=document.getElementById('cqTabela');if(!tbody)return;if(!lista.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:24px">Nenhum contrato neste filtro.</td></tr>';return;}tbody.innerHTML=lista.map(x=>{const taxa=x.taxasPendentes>0?`<div class="cq-tax ${x.taxaAtrasada?'atrasada':'pendente'}">${x.taxaAtrasada?'VENCIDA':'Pendente'}${x.proximoVencimento?' • '+cqDataBr(x.proximoVencimento):''}</div>`:'<div class="cq-tax paga">Regularizada</div>';const inicio=x.inicioStatus==='iniciou'?`<div class="cq-tax paga">Iniciou${x.primeiraPresenca?' • '+cqDataBr(x.primeiraPresenca):''}</div>`:(x.inicioStatus==='aguardando_alocacao'?'<div class="cq-tax pendente">Aguardando alocação</div>':'<div class="cq-tax atrasada">Não iniciou</div>');return `<tr><td>${cqDataBr(x.data)}</td><td><strong>${attrVisita(x.nome)}</strong>${x.protocolo?`<div style="font-size:.63rem;color:#64748b">Prot. ${attrVisita(x.protocolo)}</div>`:''}</td><td>${attrVisita(x.vendedor||'—')}</td><td><span class="cq-status ${x.status}">${({nao_revisado:'Não revisado',pendente:'Com pendência',correcao:'Correção',aprovado:'Aprovado'})[x.status]||x.status}</span></td><td>${taxa}</td><td>${x.documentosPendentes>0?`<strong style="color:#b45309">${x.documentosPendentes} pendência(s)</strong>`:'<span style="color:#15803d;font-weight:800">OK</span>'}</td><td>${inicio}</td><td>${x.proximoVencimento?cqDataBr(x.proximoVencimento):'—'}</td><td><button class="btn btn-primary btn-sm" onclick="abrirCQDigital(${x.visitaId})"><i class="fas fa-clipboard-check"></i> Conferir</button></td></tr>`;}).join('');}
+        async function carregarPainelCQ(){
+            if(!exigirVisOperadorFront())return;
+            const tbody=document.getElementById('cqTabela');
+            if(tbody)tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px">Carregando contratos...</td></tr>';
+            try{
+                const r=await apiVisitasGet('cq_painel');cqPainelCache=r.itens||[];
+                renderPainelCQ();
+            }catch(e){if(tbody)tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--danger);padding:24px">${attrVisita(e.message)}</td></tr>`;}
+        }
+        function exportarComissaoCQ(){
+            const inicio=document.getElementById('cqComissaoInicio')?.value||'';
+            const fim=document.getElementById('cqComissaoFim')?.value||'';
+            if(inicio && fim && inicio>fim){alert('A data inicial não pode ser posterior à final.');return;}
+            const qs=new URLSearchParams({action:'cq_exportar_comissao',inicio,fim});
+            window.location.href='api.php?'+qs.toString();
+        }
+        function cqGrupoPagamento(x){
+            const taxaPendente=Number(x.taxasPendentes||0)>0;
+            const taxaIsenta=Number(x.taxasIsentas||0)>0;
+            const taxaPaga=Number(x.taxasPagas||0)>0 && !taxaPendente && !taxaIsenta;
+            const primeiraPaga=x.primeiraMensalidadeStatus==='pago';
+            if(taxaPaga&&primeiraPaga)return 'completo';
+            if(taxaPaga&&!primeiraPaga)return 'primeira';
+            if(taxaPendente&&!primeiraPaga)return 'nenhum';
+            return 'outros';
+        }
+        function renderPainelCQ(){
+            const periodoInicio=document.getElementById('cqComissaoInicio')?.value||'';
+            const periodoFim=document.getElementById('cqComissaoFim')?.value||'';
+            const situacao=document.getElementById('cqSituacao')?.value||'todos';
+            const inicioFiltro=document.getElementById('cqInicio')?.value||'todos';
+            const qualidade=document.getElementById('cqFiltro')?.value||'todos';
+            const comissaoFiltro=document.getElementById('cqComissaoFiltro')?.value||'todos';
+            const doMes=(cqPainelCache||[]).filter(x=>{const d=String(x.data||'').slice(0,10);return (!periodoInicio||d>=periodoInicio)&&(!periodoFim||d<=periodoFim);});
+            const grupo=x=>cqGrupoPagamento(x);
+            const k=document.getElementById('cqKpis');
+            if(k){
+                const cards=[['Todos do período',doMes.length,'todos'],['Taxa + 1ª pagas',doMes.filter(x=>grupo(x)==='completo').length,'completo'],['Falta 1ª mensalidade',doMes.filter(x=>grupo(x)==='primeira').length,'primeira'],['Taxa e 1ª pendentes',doMes.filter(x=>grupo(x)==='nenhum').length,'nenhum'],['Outras situações',doMes.filter(x=>grupo(x)==='outros').length,'outros']];
+                cards.push(['Enviados à comissão',doMes.filter(x=>!!x.comissaoEnviadaEm).length,'_com_enviados'],['Não enviados à comissão',doMes.filter(x=>!x.comissaoEnviadaEm).length,'_com_pendentes']);
+                k.innerHTML=cards.map(([titulo,n,id])=>`<div class="cq-kpi" role="button" tabindex="0" style="cursor:pointer;${situacao===id?'outline:2px solid var(--primary);outline-offset:1px;':''}" onclick="if('${id}'.startsWith('_com_')){document.getElementById('cqComissaoFiltro').value='${id}'==='_com_enviados'?'enviado':'nao_enviado'}else{document.getElementById('cqSituacao').value='${id}'}renderPainelCQ()" onkeydown="if(event.key==='Enter'){this.click()}"><strong>${n}</strong><span>${titulo}</span></div>`).join('');
+            }
+            const lista=doMes.filter(x=>(comissaoFiltro==='todos'||(comissaoFiltro==='enviado'?!!x.comissaoEnviadaEm:!x.comissaoEnviadaEm))&&(situacao==='todos'||grupo(x)===situacao)
+                &&(inicioFiltro==='todos'||(inicioFiltro==='iniciou'?x.inicioStatus==='iniciou':x.inicioStatus!=='iniciou'))
+                &&(qualidade==='todos'||(qualidade==='aprovado'&&x.status==='aprovado')||(qualidade==='nao_revisado'&&x.status==='nao_revisado')||(qualidade==='taxa'&&Number(x.taxasPendentes)>0)||(qualidade==='documentos'&&Number(x.documentosPendentes)>0)||(qualidade==='pendencias'&&(x.status!=='aprovado'||Number(x.taxasPendentes)>0||Number(x.documentosPendentes)>0||x.financeiroStatus!=='aprovado'))));
+            const cont=document.getElementById('cqContagem');if(cont)cont.textContent=`Exibindo ${lista.length} de ${doMes.length} registros do período. Iniciados: ${lista.filter(x=>x.inicioStatus==='iniciou').length} · Não iniciados / aguardando alocação: ${lista.filter(x=>x.inicioStatus!=='iniciou').length}.`;
+            const tbody=document.getElementById('cqTabela');if(!tbody)return;
+            if(!lista.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:24px">Nenhuma matrícula encontrada para estes filtros.</td></tr>';return;}
+            tbody.innerHTML=lista.map(x=>{
+                const taxa=Number(x.taxasPendentes)>0?`<span class="cq-tax ${x.taxaAtrasada?'atrasada':'pendente'}">${x.taxaAtrasada?'Vencida':'Pendente'}</span>`:Number(x.taxasIsentas)>0?'<span class="cq-tax pendente">Isenta</span>':Number(x.taxasPagas)>0?'<span class="cq-tax paga">Paga</span>':'<span class="cq-tax pendente">Verificar</span>';
+                const primeira=x.primeiraMensalidadeStatus==='pago'?`<span class="cq-tax paga">Paga${x.primeiraMensalidadePagoEm?' · '+cqDataBr(x.primeiraMensalidadePagoEm):''}</span>`:`<span class="cq-tax pendente">${x.primeiraMensalidadeStatus==='nao_pago'?'Não paga':'Aguardando'}</span>`;
+                const inicio=x.inicioStatus==='iniciou'?`<span class="cq-tax paga">Iniciou${x.primeiraPresenca?' · '+cqDataBr(x.primeiraPresenca):''}</span>`:x.inicioStatus==='aguardando_alocacao'?'<span class="cq-tax pendente">Aguardando alocação</span>':'<span class="cq-tax atrasada">Não iniciou</span>';
+                return `<tr><td>${cqDataBr(x.data)}</td><td><strong>${attrVisita(x.nome)}</strong>${x.protocolo?`<div style="font-size:.65rem;color:#64748b">Prot. ${attrVisita(x.protocolo)}</div>`:''}</td><td>${attrVisita(x.vendedor||'—')}</td><td>${taxa}</td><td>${primeira}</td><td>${inicio}</td><td><span class="cq-status ${attrVisita(x.status)}">${({nao_revisado:'Não revisado',pendente:'Com pendência',correcao:'Correção',aprovado:'Aprovado'})[x.status]||attrVisita(x.status)}</span></td><td>${x.comissaoEnviadaEm?`<span class="cq-tax paga">Enviado · ${cqDataBr(x.comissaoEnviadaEm)}</span>`:'<span class="cq-tax pendente">Não enviado</span>'}</td><td><button class="btn btn-sm ${x.comissaoEnviadaEm?'btn-secondary':'btn-success'}" onclick="marcarComissaoCQ(${Number(x.visitaId)},${!x.comissaoEnviadaEm})">${x.comissaoEnviadaEm?'Desmarcar envio':'Marcar enviado'}</button> <button class="btn btn-primary btn-sm" onclick="abrirCQDigital(${Number(x.visitaId)})"><i class="fas fa-clipboard-check"></i> Conferir</button></td></tr>`;
+            }).join('');
+        }
+        async function marcarComissaoCQ(visitaId,enviada){
+            const item=(cqPainelCache||[]).find(x=>Number(x.visitaId)===Number(visitaId));
+            if(!item)return;
+            if(!confirm(`${enviada?'Marcar como ENVIADO à comissão':'Desmarcar o envio à comissão'}: ${item.nome}?`))return;
+            try{
+                const r=await apiVisitas('cq_marcar_comissao',{visitaId,enviada});
+                await carregarPainelCQ();
+                showToast(r.message||'Situação da comissão atualizada.');
+            }catch(e){showToast(e.message||'Erro ao atualizar comissão.','error');}
+        }
         function abrirCQDigital(visitaId){const item=(cqPainelCache||[]).find(x=>Number(x.visitaId)===Number(visitaId)),visita=visitas.find(v=>Number(v.id)===Number(visitaId));if(!item||!visita){showToast('Contrato não encontrado.','error');return;}cqDigitalAtual={item,visita};document.getElementById('cqDigitalResumo').textContent=`${visita.nomeAluno||visita.nome||'Aluno'} • ${cqDataBr(visita.data)} • ${item.vendedor||'—'}`;const c=item.checklist||{};document.getElementById('cqDadosContrato').checked=!!c.dados_contrato;document.getElementById('cqAssinaturas').checked=!!c.assinaturas;document.getElementById('cqDocumentosPessoais').checked=!!c.documentos_pessoais;document.getElementById('cqComprovanteResidencia').checked=!!c.comprovante_residencia;document.getElementById('cqPagamentoAnexado').checked=!!c.pagamento_anexado;document.getElementById('cqContratoSponte').checked=item.financeiroStatus==='aprovado';document.getElementById('cqFinanceiroResumo').innerHTML=`<strong>Financeiro:</strong> ${item.financeiroStatus==='aprovado'?'✅ Validado':item.financeiroStatus==='correcao'?'⚠️ Correção solicitada':'⏳ Aguardando validação'}${item.financeiroObservacoes?'<br><strong>Observação:</strong> '+attrVisita(item.financeiroObservacoes):''}`;document.getElementById('cqDigitalStatus').value=item.status||'nao_revisado';const pmStatus=item.primeiraMensalidadeStatus||'aguardando';document.getElementById('cqPrimeiraMensalidadeStatus').value=pmStatus;document.getElementById('cqPrimeiraMensalidadeData').value=item.primeiraMensalidadePagoEm||'';document.getElementById('cqPrimeiraMensalidadeData').disabled=pmStatus!=='pago';document.getElementById('cqDigitalObservacoes').value=item.observacoes||'';const vendas=(visita.matriculasGeradas||[]).filter(m=>m.tipoIngresso==='venda');document.getElementById('cqDigitalTaxaResumo').innerHTML=vendas.length?vendas.map(m=>`${attrVisita(m.cursoNome||m.turma||'Curso')}: <strong>${m.taxaStatus==='paga'?'Paga'+(m.taxaPagoEm?' em '+cqDataBr(m.taxaPagoEm):''):m.taxaStatus==='isenta'?'Isenta':'Pendente'+(m.taxaVencimento?' até '+cqDataBr(m.taxaVencimento):'')}</strong>`).join('<br>'):(Number(item.taxasPendentes||0)>0?'<strong>Pendente</strong>':'—');const taxaBox=document.getElementById('cqTaxaManualBox');if(taxaBox)taxaBox.style.display=Number(item.taxasPendentes||0)>0?'block':'none';document.getElementById('modalCQDigital').classList.add('active');}
         function pendenciasAtuaisCQ(){
             if(!cqDigitalAtual)return [];

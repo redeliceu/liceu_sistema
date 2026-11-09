@@ -342,6 +342,20 @@ $__mapaSupremo=authPermission($__mapPdo,'mapa.admin_supremo');
 
 
 
+
+/* Migrações — seletor pesquisável */
+.mig-intro{display:flex;gap:12px;align-items:center;padding:15px;border:1px solid #e2e8f0;border-radius:14px;background:linear-gradient(120deg,#f8fafc,#fff);margin-bottom:14px}
+.mig-symbol{width:44px;height:44px;border-radius:13px;background:#fff0e5;color:#c45a13;display:grid;place-items:center;font-size:23px;font-weight:800}
+.mig-intro strong{display:block;color:#17243a;font-size:15px}.mig-intro small{display:block;color:#64748b;margin-top:4px}
+.mig-search{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:11px;padding:12px 14px;font:inherit;background:#fff;margin-bottom:10px}
+.mig-options{max-height:310px;overflow:auto;display:grid;gap:8px;padding:2px}
+.mig-option{display:flex;align-items:center;gap:11px;border:1px solid #e2e8f0;background:#fff;border-radius:12px;padding:12px;cursor:pointer;text-align:left;width:100%;font:inherit;transition:.15s}
+.mig-option:hover{border-color:#f5a96c;background:#fffaf5}.mig-option.active{border:2px solid #e97927;background:#fff7ed;padding:11px}
+.mig-option strong{display:block;font-size:13px;color:#1e293b}.mig-option small{display:block;color:#64748b;font-size:12px;margin-top:4px}
+.mig-radio{height:18px;width:18px;flex-shrink:0;border:2px solid #cbd5e1;border-radius:50%}.mig-option.active .mig-radio{border:5px solid #e97927}
+.mig-empty{padding:22px;text-align:center;color:#64748b;border:1px dashed #cbd5e1;border-radius:12px}
+.mig-selected{margin-top:12px;padding:11px 13px;border-radius:10px;background:#f1f5f9;color:#475569;font-size:12px}
+
   /* Retenção / migrações / logs */
   .retention-chip { background:#e0f2fe; color:#075985; }
   .migration-box { border:1px solid #e2e8f0; border-radius:10px; padding:12px; background:#f8fafc; margin-top:12px; }
@@ -410,7 +424,7 @@ $__mapaSupremo=authPermission($__mapPdo,'mapa.admin_supremo');
   }
   .followup-kpis {
     display:grid;
-    grid-template-columns:repeat(5,minmax(110px,1fr));
+    grid-template-columns:repeat(6,minmax(105px,1fr));
     gap:10px;
     margin-bottom:14px;
   }
@@ -431,7 +445,7 @@ $__mapaSupremo=authPermission($__mapPdo,'mapa.admin_supremo');
     font-weight:700;
   }
   .followup-table-wrap {
-    overflow-x:hidden;
+    overflow-x:auto;
     overflow-y:auto;
     border:1px solid #e2e8f0;
     border-radius:10px;
@@ -439,12 +453,13 @@ $__mapaSupremo=authPermission($__mapPdo,'mapa.admin_supremo');
   .followup-table {
     width:100%;
     border-collapse:collapse;
-    min-width:0;
+    min-width:max-content;
   }
   .followup-table th,
   .followup-table td {
     padding:9px 10px;
-    word-break:break-word;
+    white-space:nowrap;
+    word-break:normal;
     border-bottom:1px solid #e2e8f0;
     text-align:left;
     vertical-align:middle;
@@ -748,7 +763,7 @@ $__mapaSupremo=authPermission($__mapPdo,'mapa.admin_supremo');
   .modal {
     background: #fff;
     border-radius: 14px;
-    width: min(760px, 100%);
+    width: min(1480px, calc(100vw - 28px));
     max-height: calc(100dvh - 100px);
     padding: 0;
     box-shadow: 0 16px 40px rgba(0,0,0,0.2);
@@ -770,8 +785,8 @@ $__mapaSupremo=authPermission($__mapPdo,'mapa.admin_supremo');
   }
 
   .modal h2 { margin:0; font-size: 1.2rem; padding-right:42px; }
-  .modal.modal-wide { width:min(1180px, calc(100vw - 36px)); }
-  .modal.modal-wide #modalBody { overflow-x:hidden; }
+  .modal.modal-wide { width:min(1640px, calc(100vw - 24px)); }
+  .modal.modal-wide #modalBody { overflow-x:auto; }
 
   .modal-overlay, .modal-overlay * { box-sizing:border-box; }
 
@@ -834,6 +849,17 @@ $__mapaSupremo=authPermission($__mapPdo,'mapa.admin_supremo');
     .student-filter-select { width:100%; min-width:0; }
     .student-row { align-items:flex-start; }
   }
+
+
+  /* Modais ampliados: tabelas mantêm colunas em linha única, com rolagem horizontal. */
+  @media (min-width:641px){.modal-overlay .modal{width:min(1480px,calc(100vw - 24px))}.modal-overlay .modal.modal-wide{width:min(1640px,calc(100vw - 24px))}}
+  .modal-overlay #modalBody{overflow-x:auto}
+  .modal-overlay #modalBody table:not(.radar-table) th,
+  .modal-overlay #modalBody table:not(.radar-table) td{white-space:nowrap;overflow-wrap:normal;word-break:normal}
+  .modal-overlay #modalBody .followup-table-wrap{overflow-x:auto}
+  .modal-overlay #modalBody .followup-table{width:max-content;min-width:100%}
+  .modal-overlay #modalBody .followup-table td:last-child{min-width:280px}
+  @media(max-width:640px){.modal-overlay .modal,.modal-overlay .modal.modal-wide{width:100%}}
 
   /* Toast */
   .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: #fff; padding: 10px 14px; border-radius: 8px; font-weight: 600; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
@@ -1363,6 +1389,19 @@ $__mapaSupremo=authPermission($__mapPdo,'mapa.admin_supremo');
   .map-alert-item{display:grid;grid-template-columns:32px 1fr 28px;gap:9px;align-items:start;padding:11px 12px;border-bottom:1px solid #f1f5f9}
   .map-alert-item:last-child{border-bottom:0}.map-alert-icon{width:30px;height:30px;border-radius:9px;background:#eaf3ff;color:#0b5fae;display:grid;place-items:center;font-size:.8rem}.map-alert-icon.alta{background:#fff3d6;color:#b45309}.map-alert-icon.urgente{background:#fee2e2;color:#b91c1c}.map-alert-title{font-size:.73rem;font-weight:850;color:#334155}.map-alert-text{font-size:.68rem;color:#64748b;margin-top:3px;line-height:1.35}.map-alert-date{font-size:.63rem;color:#8b5cf6;margin-top:4px;font-weight:750}.map-alert-open{border:0;background:#f1f5f9;color:#475569;border-radius:7px;width:28px;height:28px;cursor:pointer}
   @media(max-width:600px){.map-alert-menu{top:43px;right:0;width:min(360px,calc(100vw - 16px));max-height:68vh}}
+
+  /* Novos / A iniciar — filtros padronizados, sem estilos inline herdados */
+  .starter-filter-panel{background:#f8fafc;border:1px solid #e2e8f0;border-radius:13px;padding:15px;margin-bottom:14px}
+  .starter-filter-grid{display:grid;grid-template-columns:minmax(170px,1fr) minmax(240px,1.6fr) minmax(180px,1fr);gap:12px;align-items:end}
+  .starter-field{display:flex;flex-direction:column;gap:6px;font-size:.77rem;font-weight:700;color:#334155;min-width:0}
+  .starter-field>.form-control,.starter-search-field>.form-control{width:100%;height:40px;min-height:40px;border-radius:9px;background:#fff;box-sizing:border-box;font-size:.82rem}
+  .starter-search-field{position:relative;display:block}.starter-search-field svg{position:absolute;left:12px;top:12px;color:#64748b;pointer-events:none}.starter-search-field input{padding-left:37px!important}
+  .starter-filter-line{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}.starter-filter-label{font-size:.75rem;font-weight:700;color:#475569;min-width:115px}
+  .starter-segments,.starter-taxas{display:flex;gap:6px;flex-wrap:wrap}.starter-segments button,.starter-tax-chip{border:1px solid #dbe3ed;background:white;color:#475569;padding:8px 13px;border-radius:8px;font-size:.78rem;font-weight:650;cursor:pointer}
+  .starter-segments button.active,.starter-tax-chip.active{background:#eaf3ff;color:#1455a0;border-color:#83b4ef}.starter-tax-chip b{margin-left:5px;font-size:.8rem}
+  .starter-novos-kpis{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))!important}.starter-novos-kpis .starter-kpi{cursor:pointer;text-align:left;min-height:65px}.starter-novos-kpis .starter-kpi-active{border-color:#2563eb;background:#eff6ff}
+  .starter-result-count{font-size:.78rem;color:#64748b;margin:12px 0}.starter-table-wrap{overflow-x:auto;max-width:100%}.starter-table-novos{min-width:1120px}.starter-table-novos th,.starter-table-novos td{white-space:nowrap}.starter-empty{padding:20px;color:#64748b}
+  @media(max-width:900px){.starter-filter-grid{grid-template-columns:1fr 1fr}.starter-filter-grid .starter-field:nth-child(2){grid-column:span 2}}@media(max-width:560px){.starter-filter-grid{grid-template-columns:1fr}.starter-filter-grid .starter-field:nth-child(2){grid-column:auto}}
   .starter-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:12px}
   .starter-kpi{padding:10px 12px;border:1px solid #e1e8f0;border-radius:10px;background:#f8fbff}
   .starter-kpi strong{display:block;font-size:1.2rem;color:#0b5fae}.starter-kpi span{font-size:.62rem;color:#718397}
@@ -2428,7 +2467,7 @@ function applyAdminUI() {
             el.innerHTML = `
  <div class="sala-info">
                 <div class="turma-nome"><span>${esc(turma.nome)}</span></div>
-                <div class="prof">${esc(profName(turma.profId))}</div>
+                <div class="prof">${esc(profName(item.profId || turma.profId))}</div>
                 ${tipoCurso === 'gratuito' ? `<div class="card-course-type">CURSO GRATUITO</div>` : ''}
                 <div class="ratio">${item.alunos}/${capacidadeTurma}</div>
                 ${item.capacidadeExcepcional ? `<div class="card-progress" title="Capacidade física da sala: ${sala.capacidade}">Capacidade da turma: ${capacidadeTurma} • Sala: ${sala.capacidade}</div>` : ''}
@@ -3170,9 +3209,10 @@ function applyAdminUI() {
     try{
       mapaLoadingStart();
       const resp=await fetch('api.php?action=importar_inadimplencia_sponte',{method:'POST',body:fd,headers:{'X-CSRF-Token':MAP_CSRF_TOKEN},credentials:'same-origin',cache:'no-store'});
-      const txt=await resp.text();let r={};try{r=txt?JSON.parse(txt):{};}catch(e){throw new Error('Resposta inválida do servidor ao importar CSV.');}
-      if(!resp.ok||r.ok===false)throw new Error(r.error||'Não foi possível importar o relatório.');
-      await atualizarInterfaceSistema();
+      const txt=await resp.text();let r={};try{r=txt?JSON.parse(txt):{};}catch(e){throw new Error('O servidor não retornou JSON (HTTP '+resp.status+'). Confira o log PHP e o limite de upload.');}
+      if(!resp.ok||r.ok===false)throw new Error((r.error||'Não foi possível importar o relatório.')+' (HTTP '+resp.status+')');
+      try { await atualizarInterfaceSistema(); }
+      catch(refreshError) { console.warn('CSV importado, mas a atualização visual falhou:',refreshError); }
       const z=r.resumo||{},nao=r.naoVinculados||[];
       modalMode='resultado-inadimplencia-sponte';modalEditId=null;
       document.getElementById('modalTitle').textContent='Inadimplência Sponte atualizada';
@@ -3359,6 +3399,7 @@ function applyAdminUI() {
   }
 
 
+  let followupContatos = new Map();
   let followupData = [];
   let followupFilter = 'todos';
   let followupView = 'geral';
@@ -3444,52 +3485,46 @@ function applyAdminUI() {
     if(k)k.innerHTML=`<div class="na-filter-cards"><button class="na-filter-card ${naoAlocadosTipo===''?'active':''}" onclick="setNaoAlocadosTipo('')"><span class="lbl">Todos</span><span class="num">${naoAlocadosCache.length}</span></button><button class="na-filter-card ${naoAlocadosTipo==='venda'?'active':''}" onclick="setNaoAlocadosTipo('venda')"><span class="lbl">Pagos</span><span class="num">${pagos}</span></button><button class="na-filter-card ${naoAlocadosTipo==='gratuito'?'active':''}" onclick="setNaoAlocadosTipo('gratuito')"><span class="lbl">Gratuitos</span><span class="num">${gratis}</span></button></div>`;
     const ri=document.getElementById('naResultadoInfo');if(ri)ri.innerHTML=`Exibindo <b>${lista.length}</b> de ${naoAlocadosCache.length} matrícula(s) aguardando turma${q?' • busca ativa':''}.`;
     if(!lista.length){box.innerHTML='<div class="na-empty"><b>Nenhum aluno encontrado neste filtro.</b><br><span style="font-size:.85rem">Tente outro tipo ou altere a busca.</span></div>';return;}
-    box.innerHTML=`<table><thead><tr><th>Aluno</th><th>Curso</th><th>Tipo</th><th>Vendedor / origem</th><th>Desde</th><th>Alocar em turma</th></tr></thead><tbody>${lista.map(x=>{const tc=x.tipoIngresso==='gratuito'?'gratuito':'pago';const dias=diasAguardandoNaoAlocado(x.criadoEm);const opts=naoAlocadosAgendas.filter(a=>a.tipoCurso===tc&&Number(a.vagas)>0).map(a=>`<option value="${a.agendaId}">${esc(a.turma)} • ${esc(a.dia||'—')} • ${esc(a.horario||'—')} • ${a.vagas} vaga(s)</option>`).join('');return `<tr><td><div class="na-student">${esc(x.aluno)}</div><div class="na-meta">${esc(x.telefone||'Sem telefone')}</div></td><td>${esc(x.cursoNome||'—')}</td><td>${x.tipoIngresso==='gratuito'?'<span class="na-badge gratuito">Gratuito</span>':'<span class="na-badge pago">Pago</span>'}</td><td class="na-origin">${esc(x.vendedor||'Visita #'+x.visitaId)}<div class="na-meta">${esc(x.motivo||'Aguardando alocação')}</div></td><td>${esc(String(x.criadoEm||'').slice(0,10).split('-').reverse().join('/'))}${dias!==null?`<div class="na-wait">${dias===0?'desde hoje':dias+' dia'+(dias===1?'':'s')+' aguardando'}</div>`:''}</td><td><div class="na-alloc"><select id="na-ag-${x.pendingId}" class="form-control"><option value="">Selecionar turma...</option>${opts}</select><button class="btn btn-primary" onclick="alocarNaoAlocado(${x.pendingId})">Alocar</button></div></td></tr>`}).join('')}</tbody></table>`;
+    box.innerHTML=`<table><thead><tr><th>Aluno</th><th>Curso</th><th>Tipo</th><th>Vendedor / origem</th><th>Desde</th><th>Alocar em turma</th></tr></thead><tbody>${lista.map(x=>{const tc=x.tipoIngresso==='gratuito'?'gratuito':'pago';const dias=diasAguardandoNaoAlocado(x.criadoEm);const opts=naoAlocadosAgendas.filter(a=>a.tipoCurso===tc&&Number(a.vagas)>0&&['iniciar','andamento','andamento_aberta'].includes(a.status)).map(a=>`<option value="${a.agendaId}">${esc(a.turma)} • ${esc(a.dia||'—')} • ${esc(a.horario||'—')} • ${a.vagas} vaga(s)</option>`).join('');return `<tr><td><div class="na-student">${esc(x.aluno)}</div><div class="na-meta">${esc(x.telefone||'Sem telefone')}</div></td><td>${esc(x.cursoNome||'—')}</td><td>${x.tipoIngresso==='gratuito'?'<span class="na-badge gratuito">Gratuito</span>':'<span class="na-badge pago">Pago</span>'}</td><td class="na-origin">${esc(x.vendedor||'Visita #'+x.visitaId)}<div class="na-meta">${esc(x.motivo||'Aguardando alocação')}</div></td><td>${esc(String(x.criadoEm||'').slice(0,10).split('-').reverse().join('/'))}${dias!==null?`<div class="na-wait">${dias===0?'desde hoje':dias+' dia'+(dias===1?'':'s')+' aguardando'}</div>`:''}</td><td><div class="na-alloc"><select id="na-ag-${x.pendingId}" class="form-control"><option value="">Selecionar turma...</option>${opts}</select><button class="btn btn-primary" onclick="alocarNaoAlocado(${x.pendingId})">Alocar</button></div></td></tr>`}).join('')}</tbody></table>`;
   }
-  async function alocarNaoAlocado(pendingId){const sel=document.getElementById(`na-ag-${pendingId}`);const agendaId=Number(sel?.value||0);if(!agendaId){alert('Escolha a turma.');return}const item=naoAlocadosCache.find(x=>Number(x.pendingId)===Number(pendingId));const ag=naoAlocadosAgendas.find(x=>Number(x.agendaId)===agendaId);if(!confirm(`Alocar ${item?.aluno||'este aluno'} em ${ag?.turma||'esta turma'} • ${ag?.dia||''} ${ag?.horario||''}?`))return;try{const r=await apiPost('alocar_matricula_pendente',{pendingId,agendaId});alert(r.ingresso?.aguardando?'Aluno alocado. Ele aguardará o módulo/data de ingresso previsto.':'Aluno alocado com sucesso.');await carregarNaoAlocados();}catch(e){alert(e.message||'Não foi possível alocar.')}}
+  async function alocarNaoAlocado(pendingId){const sel=document.getElementById(`na-ag-${pendingId}`);const agendaId=Number(sel?.value||0);if(!agendaId){alert('Escolha a turma.');return}const item=naoAlocadosCache.find(x=>Number(x.pendingId)===Number(pendingId));const ag=naoAlocadosAgendas.find(x=>Number(x.agendaId)===agendaId);if(!confirm(`Alocar ${item?.aluno||'este aluno'} em ${ag?.turma||'esta turma'} • ${ag?.dia||''} ${ag?.horario||''}?`))return;try{const r=await api('alocar_matricula_pendente',{pendingId,agendaId});alert(r.ingresso?.aguardando?'Aluno alocado. Ele aguardará o módulo/data de ingresso previsto.':'Aluno alocado com sucesso.');await carregarNaoAlocados();}catch(e){alert(e.message||'Não foi possível alocar.')}}
 
+  let novosVisitasCache=[];
+  let novosVisitasSituacao='todos', novosVisitasTipo='todos', novosVisitasTaxa='todas', novosVisitasOrdem='entrada_desc';
+  const novosMeses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  function novosTaxaEstado(x){return x.tipoCurso==='gratuito'?'nao_aplica':(x.taxaPaga?'paga':'pendente');}
+  function renderNovosVisitas(){
+    const body=document.getElementById('modalBody');if(!body||modalMode!=='novos-a-iniciar')return;
+    const mes=document.getElementById('novosVisitasMes')?.value||'todos';
+    const busca=(document.getElementById('novosVisitasBusca')?.value||'').toLocaleLowerCase('pt-BR').trim();
+    const periodo=novosVisitasCache.filter(x=>(mes==='todos'||String(x.entrada||'').slice(0,7)===mes)&&(novosVisitasTipo==='todos'||x.tipoCurso===novosVisitasTipo));
+    const qtd=st=>periodo.filter(x=>st==='todos'||x.situacao===st).length;
+    const taxaQtd=st=>periodo.filter(x=>novosTaxaEstado(x)===st).length;
+    const lista=periodo.filter(x=>(novosVisitasSituacao==='todos'||x.situacao===novosVisitasSituacao)&&(novosVisitasTaxa==='todas'||novosTaxaEstado(x)===novosVisitasTaxa)&&(!busca||`${x.aluno} ${x.turma} ${x.telefone||''}`.toLocaleLowerCase('pt-BR').includes(busca)));
+    const sortDate=v=>String(v||'').slice(0,10);
+    lista.sort((a,b)=>{switch(novosVisitasOrdem){case 'entrada_asc':return sortDate(a.entrada).localeCompare(sortDate(b.entrada));case 'aluno':return String(a.aluno||'').localeCompare(String(b.aluno||''),'pt-BR');case 'turma':return String(a.turma||'').localeCompare(String(b.turma||''),'pt-BR');case 'taxa':return novosTaxaEstado(a).localeCompare(novosTaxaEstado(b))||String(a.aluno||'').localeCompare(String(b.aluno||''),'pt-BR');case 'situacao':return String(a.situacao||'').localeCompare(String(b.situacao||''))||String(a.aluno||'').localeCompare(String(b.aluno||''),'pt-BR');default:return sortDate(b.entrada).localeCompare(sortDate(a.entrada));}});
+    const cards=[['todos','Todas as matrículas'],['iniciado','Iniciados'],['nao_iniciado','Não iniciados'],['taxa_pendente','A iniciar • taxa pendente'],['cancelado','Cancelados'],['formado','Formados']];
+    const kp=document.getElementById('novosVisitasKpis');if(kp)kp.innerHTML=cards.map(([id,t])=>`<button type="button" class="starter-kpi ${novosVisitasSituacao===id?'starter-kpi-active':''}" onclick="novosVisitasSituacao='${id}';renderNovosVisitas()"><strong>${qtd(id)}</strong><span>${t}</span></button>`).join('');
+    const tipos=document.getElementById('novosVisitasTipos');if(tipos)tipos.querySelectorAll('[data-tipo]').forEach(el=>el.classList.toggle('active',el.dataset.tipo===novosVisitasTipo));
+    const taxas=document.getElementById('novosVisitasTaxas');if(taxas)taxas.innerHTML=[['todas','Todas as taxas',periodo.length],['paga','Taxa paga / isenta',taxaQtd('paga')],['pendente','Taxa pendente',taxaQtd('pendente')]].map(([id,t,n])=>`<button type="button" class="starter-tax-chip ${novosVisitasTaxa===id?'active':''}" onclick="novosVisitasTaxa='${id}';renderNovosVisitas()">${t} <b>${n}</b></button>`).join('');
+    const out=document.getElementById('novosVisitasTabela');if(!out)return;
+    out.innerHTML=`<div class="starter-result-count">Exibindo <b>${lista.length}</b> de ${periodo.length} matrícula(s) • Controle de Visitas desde 20/08/2026</div>`+
+      (lista.length?`<div class="starter-table-wrap"><table class="starter-table starter-table-novos"><thead><tr><th>Aluno</th><th>Turma</th><th>Dia / horário</th><th>Efetivada em</th><th>Primeira presença</th><th>Tipo</th><th>Taxa</th><th>Situação</th></tr></thead><tbody>${lista.map(x=>`<tr><td><strong>${esc(x.aluno)}</strong></td><td>${esc(x.turma||'—')}</td><td>${esc((x.dia||'—')+' • '+(x.horario||'—'))}</td><td>${dataBrStarter(x.entrada)}</td><td>${dataBrStarter(x.primeiraPresenca)}</td><td>${x.tipoCurso==='gratuito'?'Gratuito':'Pago'}</td><td>${x.tipoCurso==='gratuito'?'—':(x.taxaPaga?'Paga / isenta':'Pendente')}</td><td>${esc(({iniciado:'Iniciou',nao_iniciado:'Não iniciou',cancelado:'Cancelado',formado:'Formado',taxa_pendente:'Pendente de taxa'})[x.situacao]||x.situacao)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="starter-empty">Nenhuma matrícula encontrada com esses filtros.</div>');
+  }
   async function openNovosAIniciar(){
-    modalMode='novos-a-iniciar';
+    modalMode='novos-a-iniciar';novosVisitasSituacao='todos';novosVisitasTipo='todos';novosVisitasTaxa='todas';novosVisitasOrdem='entrada_desc';
     document.getElementById('modalBox').classList.add('modal-wide');
-    document.getElementById('modalTitle').textContent='Novos / A iniciar';
+    document.getElementById('modalTitle').textContent='Novos / A iniciar • Controle de Visitas';
     document.getElementById('modalActions').style.display='none';
-    document.getElementById('modalBody').innerHTML='<div style="padding:22px;text-align:center;color:#94a3b8">Carregando novos alunos...</div>';
+    document.getElementById('modalBody').innerHTML='<div style="padding:22px;text-align:center">Carregando matrículas efetivadas...</div>';
     openModal();
-
     try{
-      const r=await fetch('../alertas-api.php?action=novos_inicio',{credentials:'same-origin',cache:'no-store'});
-      const j=await r.json(); if(!r.ok||j.ok===false)throw new Error(j.error||'Erro ao carregar');
-      const itens=j.itens||[];
-      const aguarda=itens.filter(x=>x.grupo==='aguardando');
-      const hoje=itens.filter(x=>x.grupo==='hoje');
-      const atras=itens.filter(x=>x.grupo==='nao_iniciou');
-      const prox=aguarda.filter(x=>{
-        const d=new Date(x.inicio+'T12:00:00'),h=new Date();h.setHours(12,0,0,0);
-        return Math.ceil((d-h)/86400000)<=7;
-      });
-
-      function tabela(lista,tipo){
-        if(!lista.length)return '<div style="padding:12px;color:#94a3b8;font-size:.72rem">Nenhum aluno neste grupo.</div>';
-        return `<div class="starter-table-wrap"><table class="starter-table"><thead><tr><th>Aluno</th><th>Turma</th><th>Professor</th><th>Dia / horário</th><th>Início</th><th>Situação</th></tr></thead><tbody>${
-          lista.map(x=>`<tr><td><strong>${esc(x.aluno)}</strong></td><td>${esc(x.turma)}</td><td>${esc(x.professor||'—')}</td><td>${esc((x.dia||'—')+' • '+(x.horario||'—'))}</td><td>${dataBrStarter(x.inicio)}</td><td class="${tipo==='late'?'starter-late':tipo==='today'?'starter-today':'starter-wait'}">${tipo==='late'?(x.diasAtraso+' dia(s) sem iniciar'):tipo==='today'?'Deve iniciar hoje':'Aguardando início'}</td></tr>`).join('')
-        }</tbody></table></div>`;
-      }
-
-      document.getElementById('modalBody').innerHTML=`
-        <div class="starter-kpis">
-          <div class="starter-kpi"><strong>${aguarda.length}</strong><span>Aguardando início</span></div>
-          <div class="starter-kpi"><strong>${prox.length}</strong><span>Iniciam nos próximos 7 dias</span></div>
-          <div class="starter-kpi"><strong>${hoje.length}</strong><span>Devem iniciar hoje</span></div>
-          <div class="starter-kpi"><strong>${atras.length}</strong><span>Ainda não iniciaram</span></div>
-        </div>
-        <div style="font-size:.7rem;color:#64748b;margin-bottom:8px">Os alertas próximos do início e os atrasados viram tarefas automaticamente no sininho. A primeira presença encerra a tarefa.</div>
-        <div class="starter-group"><h3>🔴 Não iniciaram / atrasados</h3>${tabela(atras,'late')}</div>
-        <div class="starter-group"><h3>🟠 Iniciam hoje</h3>${tabela(hoje,'today')}</div>
-        <div class="starter-group"><h3>🔵 Aguardando próximo início</h3>${tabela(aguarda,'wait')}</div>`;
-      carregarBadgeAlertasMapa();
-    }catch(e){
-      document.getElementById('modalBody').innerHTML=`<div style="color:#b91c1c;padding:14px">${esc(e.message)}</div>`;
-    }
+      const j=await apiGet('novos_visitas');if(modalMode!=='novos-a-iniciar')return;
+      novosVisitasCache=j.itens||[];
+      const meses=[...new Set(novosVisitasCache.map(x=>String(x.entrada||'').slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+      document.getElementById('modalBody').innerHTML=`<div class="starter-filter-panel"><div class="starter-filter-grid"><label class="starter-field"><span>Mês de entrada</span><select id="novosVisitasMes" class="form-control" onchange="renderNovosVisitas()"><option value="todos">Todos os meses • desde 20/08/2026</option>${meses.map(m=>`<option value="${m}">${novosMeses[Number(m.slice(5,7))-1]} de ${m.slice(0,4)}</option>`).join('')}</select></label><label class="starter-field"><span>Buscar matrícula</span><span class="starter-search-field"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input id="novosVisitasBusca" class="form-control" placeholder="Nome do aluno, turma ou telefone..." oninput="renderNovosVisitas()"></span></label><label class="starter-field"><span>Organizar tabela</span><select id="novosVisitasOrdem" class="form-control" onchange="novosVisitasOrdem=this.value;renderNovosVisitas()"><option value="entrada_desc">Mais recentes primeiro</option><option value="entrada_asc">Mais antigos primeiro</option><option value="aluno">Aluno (A–Z)</option><option value="turma">Turma (A–Z)</option><option value="taxa">Situação da taxa</option><option value="situacao">Situação da matrícula</option></select></label></div><div class="starter-filter-line"><span class="starter-filter-label">Tipo de curso</span><div id="novosVisitasTipos" class="starter-segments"><button type="button" data-tipo="todos" onclick="novosVisitasTipo='todos';renderNovosVisitas()">Todos</button><button type="button" data-tipo="pago" onclick="novosVisitasTipo='pago';renderNovosVisitas()">Pagos</button><button type="button" data-tipo="gratuito" onclick="novosVisitasTipo='gratuito';renderNovosVisitas()">Gratuitos</button></div></div><div class="starter-filter-line"><span class="starter-filter-label">Pagamento da taxa</span><div id="novosVisitasTaxas" class="starter-taxas"></div></div></div><div id="novosVisitasKpis" class="starter-kpis starter-novos-kpis"></div><div id="novosVisitasTabela"></div>`;
+      renderNovosVisitas();
+    }catch(e){if(modalMode==='novos-a-iniciar')document.getElementById('modalBody').innerHTML=`<div class="alert alert-danger">${esc(e.message||'Erro ao carregar')}</div>`;}
   }
 
   setTimeout(carregarBadgeAlertasMapa,900);
@@ -3602,17 +3637,21 @@ function applyAdminUI() {
       <div id="followupGeneralView">
         <div class="followup-topbar">
           <div>
-            <div style="font-weight:800;color:#334155">Situação geral até hoje</div>
-            <div class="student-meta">Ativo/desaparecido segue a regra da última presença. Faltoso significa apenas que possui ao menos uma falta registrada.</div>
+            <div style="font-weight:800;color:#334155">Frequência mensal de alunos</div>
+            <div class="student-meta">Cada aluno é contado uma vez no mês. Compareceu = pelo menos uma presença; não compareceu = nenhuma presença no mês.</div>
           </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 16px;padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">
+          <label for="followupMesModal" style="font-size:13px;font-weight:800;color:#334155">Mês de referência</label>
+          <input id="followupMesModal" type="month" value="${dataISOHoje().slice(0,7)}" max="${dataISOHoje().slice(0,7)}" onchange="carregarAcompanhamentoGeral()" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:9px;background:white;font:inherit">
+          <span class="student-meta">Alunos únicos • presenças registradas no período</span>
         </div>
         <div id="followupKpisGeneral" class="followup-kpis"></div>
         <div class="student-filters" style="margin-bottom:12px">
           <button class="student-filter-btn active follow-general-filter" data-follow="todos" type="button">Todos</button>
-          <button class="student-filter-btn follow-general-filter" data-follow="nao_iniciado" type="button">Não iniciados</button>
-        <button class="student-filter-btn follow-general-filter" data-follow="ativo" type="button">Ativos</button>
-          <button class="student-filter-btn follow-general-filter" data-follow="desaparecido" type="button">Desaparecidos</button>
-          <button class="student-filter-btn follow-general-filter" data-follow="faltoso" type="button">Faltosos</button>
+        <button class="student-filter-btn follow-general-filter" data-follow="ativo" type="button">Compareceram</button>
+          <button class="student-filter-btn follow-general-filter" data-follow="desaparecido" type="button">Não compareceram</button>
+          <button class="student-filter-btn follow-general-filter" data-follow="faltoso" type="button">Com faltas</button>
         </div>
         <div id="followupTableGeneral"></div>
       </div>
@@ -3639,6 +3678,7 @@ function applyAdminUI() {
           <button class="student-filter-btn follow-filter-modal" data-follow="falta" type="button">Faltosos</button>
           <button class="student-filter-btn follow-filter-modal" data-follow="pendente" type="button">Chamada pendente</button>
         </div>
+        <div id="followupContatoResumo" class="student-meta" style="margin-bottom:10px"></div>
         <div id="followupTableModal"></div>
       </div>
     `;
@@ -3648,18 +3688,29 @@ function applyAdminUI() {
 
   async function carregarAcompanhamentoGeral(){
     try{
-      const r=await apiGet('acompanhamento_geral',{dataLimite:dataISOHoje(),tipoCurso:followupTipoCurso});
+      const r=await apiGet('acompanhamento_geral',{mes:document.getElementById('followupMesModal')?.value||dataISOHoje().slice(0,7),tipoCurso:followupTipoCurso});
       followupData=r.alunos||[];
-
+      window.followupEncerramentos={formado:r.formadosLista||[],cancelado:r.canceladosLista||[]};
       const tipoLabel=followupTipoCurso==='pago'?'pagos':(followupTipoCurso==='gratuito'?'gratuitos':'');
       document.getElementById('followupKpisGeneral').innerHTML=`
-        <div class="followup-kpi"><strong>${r.total}</strong><span>Alunos matriculados${tipoLabel?' • '+tipoLabel:''}</span></div>
-        <div class="followup-kpi"><strong>${r.naoIniciados || 0}</strong><span>Não iniciados</span></div>
-        <div class="followup-kpi"><strong>${r.ativos}</strong><span>Ativos</span></div>
-        <div class="followup-kpi"><strong>${r.desaparecidos}</strong><span>Desaparecidos</span></div>
-        <div class="followup-kpi"><strong>${r.faltosos}</strong><span>Com falta registrada</span></div>`;
+        <div class="followup-kpi"><strong>${r.total}</strong><span>Alunos do mês${tipoLabel?' • '+tipoLabel:''}</span></div>
+        <div class="followup-kpi"><strong>${r.ativos}</strong><span>Compareceram</span></div>
+        <div class="followup-kpi"><strong>${r.desaparecidos}</strong><span>Não compareceram</span></div>
+        <div class="followup-kpi"><strong>${r.faltosos}</strong><span>Com falta no mês</span></div>
+        <div class="followup-kpi" role="button" tabindex="0" style="cursor:pointer" onclick="mostrarEncerramentosMes('formado')" onkeydown="if(event.key==='Enter')mostrarEncerramentosMes('formado')"><strong>${r.formadosMes||0}</strong><span>Formados no mês • Ver alunos</span></div>
+        <div class="followup-kpi" role="button" tabindex="0" style="cursor:pointer" onclick="mostrarEncerramentosMes('cancelado')" onkeydown="if(event.key==='Enter')mostrarEncerramentosMes('cancelado')"><strong>${r.canceladosMes||0}</strong><span>Cancelados no mês • Ver alunos</span></div>`;
       renderFollowupGeneral();
     }catch(err){toast(err.message);}
+  }
+
+  function mostrarEncerramentosMes(tipo){
+    const box=document.getElementById('followupTableGeneral');
+    if(!box) return;
+    const lista=(window.followupEncerramentos||{})[tipo]||[];
+    const titulo=tipo==='formado'?'Formados':'Cancelados';
+    box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap"><strong>${titulo} no mês (${lista.length})</strong><button type="button" class="btn btn-ghost btn-sm" onclick="renderFollowupGeneral()">Voltar à frequência mensal</button></div>`+
+      (!lista.length?'<div class="student-meta">Nenhum registro encontrado para o mês selecionado.</div>':
+      `<div class="followup-table-wrap"><table class="followup-table"><thead><tr><th>Aluno</th><th>Turma</th><th>Data ${tipo==='formado'?'da formatura':'do cancelamento'}</th>${tipo==='cancelado'?'<th>Motivo</th>':''}</tr></thead><tbody>${lista.map(a=>`<tr><td><strong>${esc(a.aluno||'—')}</strong></td><td>${esc(a.turma||'—')}</td><td>${a.data?formatarDataBr(a.data):'—'}</td>${tipo==='cancelado'?`<td style="white-space:normal;min-width:240px;max-width:480px">${a.motivo?esc(a.motivo):'<span class="student-meta">Não informado</span>'}</td>`:''}</tr>`).join('')}</tbody></table></div>`);
   }
 
   function renderFollowupGeneral(){
@@ -3680,16 +3731,16 @@ function applyAdminUI() {
     box.innerHTML=`<div class="followup-table-wrap">
       <table class="followup-table">
         <thead><tr>
-          <th>Aluno</th><th>Turma</th><th>Status</th><th>Última presença</th><th>Faltas</th><th>Última falta</th><th>Ação</th>
+          <th>Aluno</th><th>Turma</th><th>Status</th><th>Última presença no mês</th><th>Presenças</th><th>Faltas</th><th>Última falta</th><th>Ação</th>
         </tr></thead>
         <tbody>${lista.map(a=>{
           const wa=whatsappContatoGeral(a.aluno,a.telefone,a.turma);
           return `<tr class="${a.statusAluno==='desaparecido'?'followup-row-falta':''}">
             <td><strong>${esc(a.aluno)}</strong></td>
             <td>${esc(a.turma)}</td>
-            <td>${alunoStatusHtml(a.statusAluno)}</td>
+            <td>${a.statusAluno==='ativo'?'🟢 Compareceu':a.statusAluno==='nao_iniciado'?'⚪ Nunca compareceu':'🟠 Não compareceu'}</td>
             <td>${a.ultimaPresenca?formatarDataBr(a.ultimaPresenca):'Sem presença'}</td>
-            <td><strong>${a.qtdFaltas||0}</strong></td>
+            <td><strong>${a.qtdPresencas||0}</strong></td><td><strong>${a.qtdFaltas||0}</strong></td>
             <td>${a.ultimaFalta?formatarDataBr(a.ultimaFalta):'—'}</td>
             <td>${wa?`<a class="btn btn-ghost btn-sm" href="${wa}" target="_blank" rel="noopener">Mensagem</a>`:`<button class="btn btn-ghost btn-sm" disabled>Sem telefone</button>`}</td>
           </tr>`;
@@ -3705,6 +3756,27 @@ function applyAdminUI() {
     try{
       const r=await apiGet('acompanhamento_periodo',{dataInicio,dataFim});
       followupData=r.alunos||[];
+      // A visão geral não possui filtro de data: o aviso pertence exclusivamente à visão por dia.
+      document.getElementById('followupFeriadoAviso')?.remove();
+      const feriados=Array.isArray(r.feriados)?r.feriados:[];
+      if(feriados.length){
+        const datas=feriados.map(f=>{
+          const data=typeof f==='string'?f:(f.data_aula||f.dataAula||'');
+          const obs=typeof f==='object'?(f.observacao||''):'';
+          return {data,obs};
+        }).filter(f=>f.data);
+        if(datas.length){
+          const aviso=document.createElement('div');
+          aviso.id='followupFeriadoAviso';
+          aviso.className='migration-box';
+          aviso.style.marginBottom='12px';
+          const unico=dataInicio===dataFim&&datas.length===1;
+          aviso.innerHTML=`<strong>📅 ${unico?'Feriado — sem aulas previstas nesta data':'Feriados no período'}</strong>
+            <div class="student-meta" style="margin-top:6px">${datas.map(f=>`<div><strong>${esc(formatarDataBr(f.data))}</strong>${f.obs?' — '+esc(f.obs):''}</div>`).join('')}</div>
+            <div class="student-meta" style="margin-top:6px">Essas datas não geram alunos previstos, faltas ou chamadas pendentes.</div>`;
+          document.getElementById('followupKpisModal')?.before(aviso);
+        }
+      }
       const pago=r.porTipo?.pago||{}, gratuito=r.porTipo?.gratuito||{};
       const baseDia=followupTipoCurso==='pago'?pago:(followupTipoCurso==='gratuito'?gratuito:null);
       const previstosDia=baseDia?Number(baseDia.previstos||0):Number(r.previstos||0);
@@ -3716,9 +3788,56 @@ function applyAdminUI() {
         <div class="followup-kpi"><strong>${previstosDia}</strong><span>Previstos • ${tipoDiaLabel}</span></div>
         <div class="followup-kpi"><strong>${presentesDia}</strong><span>Presentes no dia</span></div>
         <div class="followup-kpi"><strong>${faltantesDia}</strong><span>Faltosos no dia</span></div>
-        <div class="followup-kpi"><strong>${pendentesDia}</strong><span>Chamadas pendentes</span></div>`;
+        <div class="followup-kpi"><strong>${pendentesDia}</strong><span>Chamadas pendentes</span></div>
+        <div class="followup-kpi"><strong id="followupEnviadasKpi">0</strong><span>Mensagens enviadas</span></div>
+        <div class="followup-kpi"><strong id="followupRetornosKpi">0</strong><span>Retornos recebidos</span></div>`;
+      await carregarContatosFaltosos();
       renderFollowupTableModal();
     }catch(err){toast(err.message);}
+  }
+
+  function chaveContatoFaltoso(a){return `${Number(a.alunoId)}|${Number(a.agendaId)}|${a.dataAula||document.getElementById('followupDateModal')?.value||dataISOHoje()}`;}
+  async function carregarContatosFaltosos(){
+    const ini=document.getElementById('followupDateStartModal')?.value||dataISOHoje();
+    const fim=document.getElementById('followupDateModal')?.value||ini;
+    const r=await apiGet('contatos_faltosos',{dataInicio:ini,dataFim:fim});
+    followupContatos=new Map((r.contatos||[]).map(c=>[`${Number(c.aluno_id)}|${Number(c.agenda_id)}|${c.data_aula}`,c]));
+  }
+  async function confirmarContatoFaltoso(alunoId,agendaId,dataAula,confirmar){
+    const chave=`${alunoId}|${agendaId}|${dataAula}`;
+    if(confirmar && !window.confirm('Confirma que a mensagem foi realmente enviada pelo WhatsApp?'))return;
+    if(!confirmar && !window.confirm('Desfazer a confirmação manual deste contato?'))return;
+    try{
+      await api('confirmar_contato_faltoso',{alunoId,agendaId,dataAula,confirmar});
+      await carregarContatosFaltosos();
+      renderFollowupTableModal();
+      toast(confirmar?'Envio confirmado pelo operador.':'Confirmação desfeita.');
+    }catch(e){toast(e.message);}
+  }
+
+  async function editarRetornoFaltoso(alunoId,agendaId,dataAula){
+    const chave=`${alunoId}|${agendaId}|${dataAula}`;
+    const contato=followupContatos.get(chave);
+    if(!contato){toast('Confirme o envio antes de registrar o retorno.');return;}
+    document.getElementById('retornoFaltosoOverlay')?.remove();
+    const overlay=document.createElement('div');
+    overlay.id='retornoFaltosoOverlay';
+    overlay.style.cssText='position:fixed;inset:0;z-index:100010;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+    overlay.innerHTML=`<div style="background:white;width:min(680px,96vw);border-radius:16px;padding:22px;box-shadow:0 20px 70px #0003"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><strong style="font-size:19px">Retorno do contato</strong><button type="button" class="btn btn-ghost btn-sm" id="retornoFechar">Fechar</button></div><p class="student-meta">Registre a justificativa ou resposta recebida. O envio confirmado será preservado.</p><label style="display:block;font-weight:700;margin:12px 0 6px">Situação</label><select id="retornoStatus" style="width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:9px"><option value="sem_retorno">Sem retorno registrado</option><option value="pendente_retorno">Pendente de retorno</option><option value="respondido">Aluno respondeu</option><option value="resolvido">Contato concluído</option></select><label style="display:block;font-weight:700;margin:14px 0 6px">Justificativa / resposta do aluno</label><textarea id="retornoObservacao" maxlength="500" rows="5" style="width:100%;resize:vertical;padding:11px;border:1px solid #cbd5e1;border-radius:9px" placeholder="Ex.: Responsável informou que o aluno estava doente..."></textarea><div style="display:flex;justify-content:flex-end;gap:9px;margin-top:14px"><button class="btn btn-ghost" type="button" id="retornoCancelar">Cancelar</button><button class="btn btn-primary" type="button" id="retornoSalvar">Salvar acompanhamento</button></div></div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#retornoStatus').value=contato.status_retorno||'sem_retorno';
+    overlay.querySelector('#retornoObservacao').value=contato.observacao||'';
+    const fechar=()=>overlay.remove();
+    overlay.querySelector('#retornoFechar').onclick=fechar;
+    overlay.querySelector('#retornoCancelar').onclick=fechar;
+    overlay.onclick=e=>{if(e.target===overlay)fechar();};
+    overlay.querySelector('#retornoSalvar').onclick=async()=>{
+      const btn=overlay.querySelector('#retornoSalvar');btn.disabled=true;
+      try{
+        await api('atualizar_retorno_faltoso',{alunoId,agendaId,dataAula,statusRetorno:overlay.querySelector('#retornoStatus').value,observacao:overlay.querySelector('#retornoObservacao').value});
+        await carregarContatosFaltosos();renderFollowupTableModal();fechar();toast('Acompanhamento atualizado.');
+      }catch(e){toast(e.message);btn.disabled=false;}
+    };
   }
 
   function resumoAcompanhamentoPorTipo(tipo){
@@ -3747,15 +3866,22 @@ function applyAdminUI() {
       linhas.push(`✅ *Presenças registradas:* ${x.presentes}`);
       linhas.push(`❌ *Faltas registradas:* ${x.faltas}`);
       linhas.push(`⚠️ *CHAMADA NÃO ATUALIZADA:* *${x.pendentes}*`);
+      // Apenas contatos confirmados manualmente, vinculados às linhas deste período e tipo.
+      const chaves=new Set(followupData.filter(a=>tipo==='todos'||a.tipoCurso===tipo).map(chaveContatoFaltoso));
+      const contatos=[...chaves].map(chave=>followupContatos.get(chave)).filter(Boolean);
+      const enviados=contatos.length;
+      const retornos=contatos.filter(c=>['respondido','resolvido'].includes(c.status_retorno)).length;
+      linhas.push(`📲 *Mensagens enviadas:* ${enviados}`);
+      linhas.push(`💬 *Retornos recebidos:* ${retornos}`);
       linhas.push('');
       return x;
     };
 
     let total;
     if(followupTipoCurso==='todos'){
-      total=bloco('📌 *TOTAL GERAL*','todos');
       bloco('💳 *PAGOS*','pago');
       bloco('🎓 *GRATUITOS*','gratuito');
+      total=bloco('📌 *TOTAL GERAL*','todos');
     }else if(followupTipoCurso==='pago') total=bloco('💳 *PAGOS*','pago');
     else total=bloco('🎓 *GRATUITOS*','gratuito');
 
@@ -3810,6 +3936,16 @@ function applyAdminUI() {
       if(followupFilter==='todos') return true;
       return a.situacaoChamada===followupFilter;
     });
+    const faltas=followupData.filter(a=>a.situacaoChamada==='falta'&&(followupTipoCurso==='todos'||a.tipoCurso===followupTipoCurso));
+    const confirmados=faltas.filter(a=>followupContatos.has(chaveContatoFaltoso(a))).length;
+    const retornosRecebidos=faltas.filter(a=>['respondido','resolvido'].includes(followupContatos.get(chaveContatoFaltoso(a))?.status_retorno)).length;
+    const aguardandoRetorno=faltas.filter(a=>followupContatos.get(chaveContatoFaltoso(a))?.status_retorno==='pendente_retorno').length;
+    const resumo=document.getElementById('followupContatoResumo');
+    const kpiEnvios=document.getElementById('followupEnviadasKpi');
+    if(kpiEnvios)kpiEnvios.textContent=String(confirmados);
+    const kpiRetornos=document.getElementById('followupRetornosKpi');
+    if(kpiRetornos)kpiRetornos.textContent=String(retornosRecebidos);
+    if(resumo) resumo.innerHTML=`<strong>Mensagens aos faltosos:</strong> ${confirmados} envio(s) confirmado(s) pelo operador de ${faltas.length} falta(s) registrada(s) • ${faltas.length-confirmados} sem contato • ${retornosRecebidos} retorno(s) recebido(s) e tabulado(s) • ${aguardandoRetorno} aguardando resposta. <span style="color:#64748b">Abertura do WhatsApp não confirma envio.</span>`;
     if(!lista.length){box.innerHTML=`<div class="student-meta">Nenhum aluno encontrado para este filtro.</div>`;return;}
 
     box.innerHTML=`<div class="followup-table-wrap"><table class="followup-table">
@@ -3817,12 +3953,16 @@ function applyAdminUI() {
       <tbody>${lista.map(a=>{
         const label=a.situacaoChamada==='presente'?'Presente':a.situacaoChamada==='falta'?'Falta':'Chamada pendente';
         const wa=a.situacaoChamada==='falta'?whatsappFaltaLink(a.aluno,a.telefone,a.turma,a.dataAula||dataAula):'';
+        const contato=followupContatos.get(chaveContatoFaltoso(a));
+        const diaContato=a.dataAula||dataAula;
+        const aId=Number(a.alunoId),agId=Number(a.agendaId);
+        const acaoContato=a.situacaoChamada==='falta'?`<div style="display:flex;gap:5px;flex-wrap:nowrap;align-items:center;white-space:nowrap">${wa?`<a class="btn btn-ghost btn-sm" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`:`<span class="student-meta">Sem telefone</span>`}${contato?`<button class="btn btn-ghost btn-sm" type="button" style="white-space:nowrap;${contato.status_retorno==='pendente_retorno'?'border-color:#f59e0b;color:#92400e;':contato.status_retorno==='respondido'||contato.status_retorno==='resolvido'?'border-color:#16a34a;color:#15803d;':'border-color:#cbd5e1;color:#334155;'}" title="Envio confirmado por ${esc(contato.operador||'operador')} em ${esc(contato.confirmado_em||'data não informada')}. ${contato.status_retorno==='pendente_retorno'?'Aguardando resposta':contato.status_retorno==='respondido'?'Aluno respondeu':contato.status_retorno==='resolvido'?'Contato concluído':'Sem retorno registrado'}. Clique para editar." onclick="editarRetornoFaltoso(${aId},${agId},'${diaContato}')">${contato.status_retorno==='pendente_retorno'?'◷ Retorno':contato.status_retorno==='respondido'||contato.status_retorno==='resolvido'?'✓ Retorno':'Retorno'}</button>`:`<button class="btn btn-primary btn-sm" type="button" onclick="confirmarContatoFaltoso(${aId},${agId},'${diaContato}',true)">Confirmar</button>`}</div>`:'—';
         const cls=a.situacaoChamada==='presente'?'followup-row-presente':a.situacaoChamada==='falta'?'followup-row-falta':'followup-row-pendente';
         return `<tr class="${cls}">
           <td><strong>${a.dataAula?formatarDataBr(a.dataAula):'—'}</strong></td>
           <td><strong>${esc(a.aluno)}</strong><div class="student-meta">${alunoStatusHtml(a.statusAluno)}</div></td>
           <td>${esc(a.turma)}</td><td><span class="course-type-chip ${a.tipoCurso==='gratuito'?'gratuito':'pago'}">${a.tipoCurso==='gratuito'?'Gratuito':'Pago'}</span></td><td>${esc(a.professor)}</td><td>${esc(a.horario)}</td><td><strong>${label}</strong></td>
-          <td>${a.situacaoChamada==='falta'?(wa?`<a class="btn btn-ghost btn-sm" href="${wa}" target="_blank" rel="noopener">Mandar mensagem</a>`:`<button class="btn btn-ghost btn-sm" disabled>Sem telefone</button>`):'—'}</td>
+          <td>${acaoContato}</td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
@@ -3928,8 +4068,25 @@ function applyAdminUI() {
   }
 
   /* ========== MODAL CONTROLE ========== */
-  function openModal() { document.getElementById('modalOverlay').classList.add('open'); }
+  function openModal() {
+    document.getElementById('chamadaResultadoPersistente')?.remove();
+    const overlay=document.getElementById('modalOverlay');
+    const actions=document.getElementById('modalActions');
+    const confirm=document.getElementById('modalConfirm');
+    // Modais de edicao nao podem herdar o rodape oculto de modais somente leitura.
+    const acoesObrigatorias={
+      'evento-aula':'Salvar situação',
+      'trocar-professor':'Confirmar troca'
+    };
+    if(Object.prototype.hasOwnProperty.call(acoesObrigatorias,modalMode)){
+      if(actions){actions.style.setProperty('display','flex','important');actions.hidden=false;}
+      if(confirm){confirm.hidden=false;confirm.disabled=false;confirm.style.removeProperty('display');confirm.textContent=acoesObrigatorias[modalMode];}
+      document.getElementById('modalBox')?.classList.remove('modal-radar','modal-wide');
+    }
+    overlay?.classList.add('open');
+  }
   function closeModal() {
+    document.getElementById('chamadaResultadoPersistente')?.remove();
     // Se a ficha foi aberta a partir do Radar, fechar volta exatamente para a tabela anterior,
     // sem refazer a consulta nem obrigar o usuário a abrir o Radar de novo.
     if(modalReturnSnapshot && modalMode!=='radar-gestao'){
@@ -4526,17 +4683,24 @@ function applyAdminUI() {
     const data=new Date(), hoje=`${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,'0')}-${String(data.getDate()).padStart(2,'0')}`;
     modalMode='evento-aula';modalEditId={agendaId};
     document.getElementById('modalTitle').textContent='Feriado / aula cancelada';
-    document.getElementById('modalBody').innerHTML=`<div class="form-group"><label>Data</label><input type="date" id="eventoData" value="${hoje}" onchange="consultarEventoAula()"></div><div class="form-group"><label>Situação</label><select id="eventoTipo"><option value="feriado">Feriado</option><option value="aula_cancelada">Aula cancelada</option><option value="normal">Remover marcação / aula normal</option></select></div><div class="form-group"><label>Observação</label><input id="eventoObs" maxlength="500" placeholder="Motivo (opcional)"></div><div class="student-meta">Feriado e cancelamento não geram presença, falta ou avanço de módulo. Chamadas já existentes não serão apagadas.</div>`;
+    document.getElementById('modalBody').innerHTML=`<div class="form-group"><label>Data</label><input type="date" id="eventoData" value="${hoje}" onchange="consultarEventoAula()"></div><div class="form-group"><label>Situação</label><select id="eventoTipo"><option value="feriado">Feriado</option><option value="aula_cancelada">Aula cancelada</option><option value="normal">Remover marcação / aula normal</option></select></div><div class="form-group"><label>Observação</label><input id="eventoObs" maxlength="500" placeholder="Motivo (opcional)"></div><div class="student-meta">Feriado vale para todas as turmas nesta data. Aula cancelada vale somente para esta turma. Chamadas existentes nunca serão apagadas.</div>`;
     document.getElementById('modalActions').style.display='flex';document.getElementById('modalConfirm').textContent='Salvar situação';openModal();consultarEventoAula();
   }
   async function consultarEventoAula(){
     const dt=document.getElementById('eventoData')?.value;if(!dt)return;
     try{const r=await apiGet('evento_aula_consultar',{agendaId:modalEditId.agendaId,dataAula:dt});
-      document.getElementById('eventoTipo').value=r.evento?.tipo||'feriado';document.getElementById('eventoObs').value=r.evento?.observacao||'';
+      document.getElementById('eventoTipo').value=r.evento?.tipo||'normal';document.getElementById('eventoObs').value=r.evento?.observacao||'';
+      modalEditId.feriadoUniversal=!!r.evento?.universal;
     }catch(e){toast(e.message)}
   }
   async function salvarEventoAula(){
-    try{await api('evento_aula_salvar',{agendaId:modalEditId.agendaId,dataAula:document.getElementById('eventoData').value,tipo:document.getElementById('eventoTipo').value,observacao:document.getElementById('eventoObs').value});closeModal();toast('Situação da aula salva.');}
+    try{
+      const tipo=document.getElementById('eventoTipo').value;
+      const removerFeriadoGeral=tipo==='normal'&&!!modalEditId.feriadoUniversal;
+      if(removerFeriadoGeral&&!confirm('Remover o feriado geral desta data para TODAS as turmas?'))return;
+      if(tipo==='feriado'&&!confirm('Marcar esta data como feriado para TODAS as turmas?'))return;
+      await api('evento_aula_salvar',{agendaId:modalEditId.agendaId,dataAula:document.getElementById('eventoData').value,tipo,observacao:document.getElementById('eventoObs').value,removerFeriadoGeral});closeModal();toast('Situação do calendário salva.');
+    }
     catch(e){toast(e.message)}
   }
   function openTrocarProfessor(agendaId,turmaId){
@@ -4565,14 +4729,14 @@ function applyAdminUI() {
       const modulosChamada = r.modulos || [];
       const moduloAtualId = Number(r.moduloId || 0);
       modalMode = 'chamada';
-      modalEditId = { turmaId, agendaId, dia, horario, dataAula, professorId: turma.profId, moduloId: moduloAtualId };
+      modalEditId = { turmaId, agendaId, dia, horario, dataAula, professorId: Number(db.agenda?.[dia]?.[horario]?.[Object.keys(db.agenda?.[dia]?.[horario]||{}).find(k=>Number(db.agenda[dia][horario][k]?.agendaId)===Number(agendaId))]?.profId || turma.profId), moduloId: moduloAtualId };
       document.getElementById('modalTitle').textContent = `Chamada • ${turma.nome}`;
       document.getElementById('modalBody').innerHTML = `
         <div class="migration-box" style="margin-bottom:12px">
           <div class="migration-box-title">Dados da aula</div>
           <div class="form-group">
             <label>Data real da aula</label>
-            <input id="mChamadaData" type="date" value="${esc(dataAula)}">
+            <input id="mChamadaData" type="date" value="${esc(dataAula)}" onchange="atualizarSituacaoDataChamada()">
             <div class="student-meta" style="margin-top:4px">
               Pode selecionar uma data anterior caso a chamada esteja sendo lançada com atraso.
             </div>
@@ -4604,6 +4768,7 @@ function applyAdminUI() {
         <div class="student-meta" style="margin:0 0 10px">
           Regra da chamada: alunos marcados ficam como presença; alunos não marcados serão registrados automaticamente como falta.
         </div>
+        <div id="chamadaAvisoEvento" style="display:none"></div>
         <div class="attendance-summary" id="attendanceSummary"></div>
         <div class="student-list" id="chamadaListaAlunos">
           ${alunos.length ? alunos.map(linhaAlunoChamada).join('') : `<div class="student-meta">Nenhum aluno matriculado nesta turma.</div>`}
@@ -4615,7 +4780,33 @@ function applyAdminUI() {
         atualizarResumoChamada();
       }, 0);
       openModal();
+      await atualizarSituacaoDataChamada();
     } catch(err) { toast(err.message); }
+  }
+
+  async function atualizarSituacaoDataChamada(){
+    if(modalMode!=='chamada'||!modalEditId)return;
+    const agendaId=modalEditId.agendaId, dataAula=document.getElementById('mChamadaData')?.value;
+    const aviso=document.getElementById('chamadaAvisoEvento'), lista=document.getElementById('chamadaListaAlunos'), resumo=document.getElementById('attendanceSummary'), btn=document.getElementById('modalConfirm');
+    if(!dataAula||!aviso)return;
+    const sequencia=(modalEditId.verificacaoEvento||0)+1;modalEditId.verificacaoEvento=sequencia;
+    if(btn)btn.disabled=true;
+    try{
+      const r=await apiGet('evento_aula_consultar',{agendaId,dataAula});
+      if(modalMode!=='chamada'||!modalEditId||modalEditId.verificacaoEvento!==sequencia)return;
+      const evento=r.evento;
+      if(evento){
+        const titulo=evento.tipo==='feriado'?'Feriado':'Aula cancelada';
+        aviso.style.display='block';aviso.innerHTML=`<div class="migration-box" style="padding:18px;border:1px solid #f59e0b;background:#fffbeb;border-radius:12px"><strong>${titulo} — não haverá aula nesta data.</strong>${evento.observacao?`<p>${esc(evento.observacao)}</p>`:''}<p class="student-meta">Nenhuma presença ou falta será registrada.</p></div>`;
+        if(lista)lista.style.display='none';if(resumo)resumo.style.display='none';
+        if(btn)btn.style.display='none';
+      }else{
+        aviso.style.display='none';aviso.innerHTML='';
+        if(lista)lista.style.display='';if(resumo)resumo.style.display='';
+        if(btn){btn.style.display='';btn.disabled=false;}
+        await recarregarChamadaPorModulo(document.getElementById('mChamadaModulo')?.value||0);
+      }
+    }catch(e){if(modalEditId?.verificacaoEvento===sequencia){aviso.style.display='block';aviso.textContent='Não foi possível verificar a situação desta data: '+e.message;if(btn)btn.disabled=true;}}
   }
 
   function atualizarResumoChamada() {
@@ -4632,12 +4823,25 @@ function applyAdminUI() {
     const dataAula = document.getElementById('mChamadaData')?.value || modalEditId.dataAula;
     const moduloId = parseInt(document.getElementById('mChamadaModulo')?.value || modalEditId.moduloId || 0);
     const presencas = Array.from(document.querySelectorAll('.presenca-check')).map(c => ({ alunoId: parseInt(c.dataset.alunoId), presente: c.checked }));
+    const box=document.getElementById('modalBody');
+    let aviso=document.getElementById('chamadaResultadoPersistente');
+    if(!aviso && box){aviso=document.createElement('div');aviso.id='chamadaResultadoPersistente';aviso.setAttribute('role','alert');aviso.style.cssText='padding:12px 14px;margin:12px 0;border:1px solid #f59e0b;border-radius:10px;background:#fffbeb;color:#92400e;font-weight:700;white-space:normal';box.appendChild(aviso);}
+    const mostrar=(msg,erro=false)=>{if(aviso){aviso.textContent=msg;aviso.style.display='block';aviso.style.background=erro?'#fef2f2':'#eff6ff';aviso.style.color=erro?'#991b1b':'#1e40af';aviso.style.borderColor=erro?'#fca5a5':'#93c5fd';}else alert(msg);};
+    if(!presencas.length){mostrar('Nenhum aluno elegível está listado nesta chamada. Não foi salvo nenhum registro. Confira data, módulo e alocação.',true);return;}
+    const btn=document.getElementById('modalConfirm');if(btn)btn.disabled=true;
     try {
-      await api('save_chamada', { turmaId, agendaId, dia, horario, dataAula, professorId, moduloId, presencas });
-      await atualizarInterfaceSistema();
-      closeModal();
-      toast('Chamada salva com sucesso.');
-    } catch(err) { toast(err.message); }
+      mostrar('Salvando chamada. Aguarde a confirmação do servidor...');
+      const resultado=await api('save_chamada', { turmaId, agendaId, dia, horario, dataAula, professorId, moduloId, presencas });
+      if(!resultado?.ok || !resultado?.chamadaId)throw new Error('O servidor não confirmou o identificador da chamada. Confira o registro antes de tentar novamente.');
+      if(Number(resultado.presencasGravadas??presencas.length)===0)throw new Error('Chamada criada, mas nenhuma presença foi gravada. Não repita o envio; confira a elegibilidade dos alunos.');
+      mostrar('Chamada nº '+resultado.chamadaId+' salva no banco. Atualizando a tela...');
+      try{await atualizarInterfaceSistema();}catch(refreshErr){
+        mostrar('Chamada nº '+resultado.chamadaId+' SALVA no banco, mas a atualização da tela falhou: '+refreshErr.message+'. Atualize a página para conferir.',true);
+        return;
+      }
+      closeModal();toast('Chamada salva com sucesso.');
+    } catch(err) {mostrar('Falha ao salvar a chamada: '+(err?.message||String(err)),true);console.error('[Mapa chamada]',err);}
+    finally{if(btn)btn.disabled=false;}
   }
 
   function closeAcademicDashboard(){const el=document.getElementById('academicDashboard');if(el)el.remove();document.body.style.overflow='';}
@@ -4856,6 +5060,8 @@ function applyAdminUI() {
           const plano=await apiGet('chamada_planejamento_mensal',{agendaId:it.agendaId,mes:mesIso}); const aulas=plano.datas||[]; if(!aulas.length)continue;
           const r={alunos:plano.alunos||[]}; folhas.push({...it,r,planejamento:aulas});
         }else{
+          const situacao=await apiGet('evento_aula_consultar',{agendaId:it.agendaId,dataAula});
+          if(situacao.evento)continue;
           const r=await apiGet('chamada_detalhes',{turmaId:it.turma.id,agendaId:it.agendaId,dataAula,horario:it.horario}); folhas.push({...it,r});
         }
       }
@@ -5003,52 +5209,41 @@ function applyAdminUI() {
     }
   }
 
+  let migDestinos=[];
+  function renderMigDestinos(){
+    const box=document.getElementById('migDestinos');if(!box)return;
+    const q=(document.getElementById('migBusca')?.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+    const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    const filtered=migDestinos.filter(d=>!q||norm([d.nome,d.professor,d.dia,d.horario,d.sala,d.capacidade].join(' ')).includes(q));
+    const sel=document.getElementById('migDestinoValor');const chosen=String(sel?.value||'');
+    box.innerHTML=filtered.length?filtered.map(d=>`<button type="button" class="mig-option ${String(d.id)===chosen?'active':''}" onclick="selectMigDestino('${esc(String(d.id))}')"><span class="mig-radio"></span><span><strong>${esc(d.nome)}</strong><small>${esc([d.professor,d.dia,d.horario,d.sala].filter(Boolean).join(' • '))}${d.capacidade?' • Capacidade '+esc(String(d.capacidade)):''}</small></span></button>`).join(''):'<div class="mig-empty">Nenhum destino corresponde à busca.</div>';
+    const info=document.getElementById('migSelected');if(info)info.textContent=chosen?'Destino selecionado: '+(migDestinos.find(d=>String(d.id)===chosen)?.nome||chosen):'Selecione um destino para continuar.';
+  }
+  function selectMigDestino(id){const el=document.getElementById('migDestinoValor');if(el)el.value=id;renderMigDestinos();}
+  function migSeletor(destinos, descricao){
+    migDestinos=destinos;
+    return `<div class="mig-intro"><div class="mig-symbol">⇄</div><div><strong>${esc(descricao)}</strong><small>Pesquise, escolha o destino e confirme a movimentação.</small></div></div><input id="migBusca" class="mig-search" type="search" placeholder="Buscar por turma, professor, sala, dia ou horário..." oninput="renderMigDestinos()" autocomplete="off"><input id="migDestinoValor" type="hidden" value=""><div id="migDestinos" class="mig-options"></div><div id="migSelected" class="mig-selected">Selecione um destino para continuar.</div>`;
+  }
   function openMigrarAluno(alunoId, turmaOrigemId, agendaOrigemId, alunoNome) {
     if(!exigirAdminFront()) return;
-
-    const destinos = [];
-    diasSemana.forEach(dia => {
-      horarios.forEach(h => {
-        Object.entries(db.agenda[dia][h] || {}).forEach(([salaId, item]) => {
-          if(!item || !item.turmaId || item.agendaId === agendaOrigemId) return;
-          const t = db.turmas.find(x => x.id === item.turmaId);
-          const s = db.salas.find(x => x.id === salaId);
-          if(t) destinos.push({
-            agendaId:item.agendaId,
-            turmaId:t.id,
-            nome:t.nome,
-            professor:profName(t.profId),
-            dia,
-            horario:h,
-            sala:s?.nome || salaId
-          });
-        });
-      });
-    });
-
-    if(!destinos.length) { toast('Não há outra turma disponível para migração.'); return; }
-
-    modalMode='migrar-aluno';
-    modalEditId={alunoId,turmaOrigemId,agendaOrigemId};
-
-    document.getElementById('modalTitle').textContent=`Migrar aluno • ${alunoNome}`;
-    document.getElementById('modalBody').innerHTML=`
-      <div class="migration-box">
-        <div class="migration-box-title">Turma / horário de destino</div>
-        <div class="form-group" style="margin-bottom:0">
-          <select id="mMigrarAlunoDestino" size="6" style="width:100%">
-            ${destinos.map(d=>`<option value="${d.agendaId}">${esc(d.nome)} • ${esc(d.professor)} • ${esc(d.dia)} • ${esc(d.horario)} • ${esc(d.sala)}</option>`).join('')}
-          </select>
-        </div>
-      </div>`;
-    document.getElementById('modalActions').style.display='flex';
-    document.getElementById('modalConfirm').textContent='Migrar aluno';
-    openModal();
+    const destinos=[];
+    diasSemana.forEach(dia=>horarios.forEach(h=>Object.entries(db.agenda[dia]?.[h]||{}).forEach(([salaId,item])=>{
+      if(!item||!item.turmaId||Number(item.agendaId)===Number(agendaOrigemId))return;
+      const t=db.turmas.find(x=>Number(x.id)===Number(item.turmaId));const sala=db.salas.find(x=>String(x.id)===String(salaId));
+      if(t)destinos.push({id:item.agendaId,nome:t.nome,professor:profName(item.professorId||item.profId||t.profId),dia,horario:h,sala:sala?.nome||salaId});
+    })));
+    if(!destinos.length){toast('Não há outra turma disponível para migração.');return;}
+    modalMode='migrar-aluno';modalEditId={alunoId,turmaOrigemId,agendaOrigemId};
+    document.getElementById('modalBox').classList.add('modal-wide');
+    document.getElementById('modalTitle').textContent='Migrar aluno • '+alunoNome;
+    document.getElementById('modalBody').innerHTML=migSeletor(destinos,'Escolha a turma de destino');
+    document.getElementById('modalActions').style.display='flex';document.getElementById('modalConfirm').textContent='Migrar aluno';
+    openModal();renderMigDestinos();
   }
 
   async function saveMigrarAluno() {
     if(!exigirAdminFront()) return;
-    const agendaDestinoId=parseInt(document.getElementById('mMigrarAlunoDestino')?.value||0);
+    const agendaDestinoId=parseInt(document.getElementById('migDestinoValor')?.value||0);
     if(!agendaDestinoId){toast('Selecione o destino.');return;}
 
     try {
@@ -5063,51 +5258,24 @@ function applyAdminUI() {
     } catch(err){toast(err.message);}
   }
 
-  function openMigrarTurmaSala(turmaId, dia, horario, salaOrigemId) {
-    if(!exigirAdminFront()) return;
-
-    const ocupadas = new Set(
-      Object.entries(db.agenda[dia]?.[horario] || {})
-        .filter(([, item]) => item && item.turmaId)
-        .map(([salaId]) => salaId)
-    );
-
-    const destinos = db.salas.filter(s => s.id !== salaOrigemId && !ocupadas.has(s.id));
-
-    if(!destinos.length) {
-      toast('Não há sala livre nesse dia e horário.');
-      return;
-    }
-
-    modalMode = 'migrar-turma-sala';
-    modalEditId = { turmaId, dia, horario, salaOrigemId };
-
-    const atual = db.salas.find(s => s.id === salaOrigemId);
-
-    document.getElementById('modalTitle').textContent = 'Migrar turma de sala';
-    document.getElementById('modalBody').innerHTML = `
-      <div class="student-meta" style="margin-bottom:10px">
-        ${esc(dia)} • ${esc(horario)} • Atual: ${esc(atual?.nome || salaOrigemId)}
-      </div>
-      <div class="form-group">
-        <label>Nova sala</label>
-        <select id="mMigrarSalaDestino">
-          ${destinos.map(s => `<option value="${esc(s.id)}">${esc(s.nome)} • capacidade ${s.capacidade}</option>`).join('')}
-        </select>
-      </div>
-      <div class="student-meta">
-        A turma continuará no mesmo dia e horário. Apenas a sala será alterada e a movimentação ficará registrada no histórico de logs.
-      </div>
-    `;
-    document.getElementById('modalActions').style.display = 'flex';
-    document.getElementById('modalConfirm').textContent = 'Migrar sala';
-    openModal();
+  function openMigrarTurmaSala(turmaId,dia,horario,salaOrigemId){
+    if(!exigirAdminFront())return;
+    const ocupadas=new Set(Object.entries(db.agenda[dia]?.[horario]||{}).filter(([,item])=>item&&item.turmaId).map(([id])=>String(id)));
+    const destinos=db.salas.filter(s=>String(s.id)!==String(salaOrigemId)&&!ocupadas.has(String(s.id))).map(s=>({id:s.id,nome:s.nome,capacidade:s.capacidade,dia,horario}));
+    if(!destinos.length){toast('Não há sala livre nesse dia e horário.');return;}
+    modalMode='migrar-turma-sala';modalEditId={turmaId,dia,horario,salaOrigemId};
+    const atual=db.salas.find(s=>String(s.id)===String(salaOrigemId));
+    document.getElementById('modalBox').classList.add('modal-wide');
+    document.getElementById('modalTitle').textContent='Migrar turma de sala';
+    document.getElementById('modalBody').innerHTML=migSeletor(destinos,'Escolha a nova sala')+`<div class="student-meta" style="margin-top:12px">Atual: ${esc(atual?.nome||salaOrigemId)} • ${esc(dia)} • ${esc(horario)}. A turma mantém o dia e horário; a mudança fica no histórico.</div>`;
+    document.getElementById('modalActions').style.display='flex';document.getElementById('modalConfirm').textContent='Migrar sala';
+    openModal();renderMigDestinos();
   }
 
   async function saveMigrarTurmaSala() {
     if(!exigirAdminFront()) return;
 
-    const salaDestinoId = document.getElementById('mMigrarSalaDestino')?.value || '';
+    const salaDestinoId = document.getElementById('migDestinoValor')?.value || '';
     if(!salaDestinoId) {
       toast('Selecione a sala de destino.');
       return;
@@ -5618,6 +5786,7 @@ function applyAdminUI() {
       if(radarGestaoFiltro==='em_dia') mostrar=fin==='em_dia';
       else if(radarGestaoFiltro==='inadimplente') mostrar=fin==='inadimplente' || fin==='em_dia_com_pendencia';
       else if(radarGestaoFiltro==='pendencia_anterior') mostrar=fin==='em_dia_com_pendencia';
+      else if(radarGestaoFiltro==='quitados') mostrar=fin==='quitado';
       else if(radarGestaoFiltro==='nao_informado') mostrar=fin==='nao_informado';
       else if(radarGestaoFiltro==='sem_financeiro') mostrar=fin==='sem_financeiro';
       else if(radarGestaoFiltro==='desaparecidos') mostrar=tr.dataset.statusAluno==='desaparecido';
@@ -5822,6 +5991,7 @@ function applyAdminUI() {
           <div class="student-filters" style="margin:0 0 10px;display:flex;gap:7px;flex-wrap:wrap;align-items:center">
             <button class="student-filter-btn radar-filter-btn active" data-radar-filtro="todos" type="button" onclick="filtrarRadarGestao('todos')">Todos pagantes</button>
             <button class="student-filter-btn radar-filter-btn" data-radar-filtro="em_dia" type="button" onclick="filtrarRadarGestao('em_dia')">Em dia</button>
+            <button class="student-filter-btn radar-filter-btn" data-radar-filtro="quitados" type="button" onclick="filtrarRadarGestao('quitados')">Quitados</button>
             <button class="student-filter-btn radar-filter-btn" data-radar-filtro="inadimplente" type="button" onclick="filtrarRadarGestao('inadimplente')">Inadimplentes</button>
             <button class="student-filter-btn radar-filter-btn" data-radar-filtro="ativos_pagantes" type="button" onclick="filtrarRadarGestao('ativos_pagantes')">Ativos pagantes</button>
             <button class="student-filter-btn radar-filter-btn" data-radar-filtro="ativos_inadimplentes" type="button" onclick="filtrarRadarGestao('ativos_inadimplentes')">Ativos com débito</button>
@@ -5901,7 +6071,27 @@ function applyAdminUI() {
     document.getElementById('modalActions').style.display='';document.getElementById('modalConfirm').textContent='Salvar';openModal();
   }
   async function salvarGestaoMatricula(){
-    const d={matriculaId:modalEditId.matriculaId,alunoNome:document.getElementById('gAlunoNome').value.trim(),duracaoFinanceiraMeses:document.getElementById('gDuracaoFinanceira').value,duracaoPedagogicaMeses:document.getElementById('gDuracaoPedagogica').value,dataInicioPedagogica:document.getElementById('gInicioPedagogico').value,dataInicioFinanceira:document.getElementById('gInicioFinanceiro').value,dataUltimaParcelaFinanceira:document.getElementById('gUltimaParcelaFinanceiro').value,ultimoPagamentoManual:document.getElementById('gUltimoPagamentoManual').value,financeiroStatus:document.getElementById('gFinanceiro').value,mesesInadimplencia:Number(document.getElementById('gMeses').value||0),financeiroObservacoes:document.getElementById('gObs').value};
+    const a=(radarGestaoCache?.alunos||[]).find(x=>Number(x.matriculaId)===Number(modalEditId.matriculaId));
+    if(!a) return toast('Matrícula não encontrada no Radar.');
+    const d={matriculaId:modalEditId.matriculaId};
+    // Envia somente valores alterados, evitando gravar NULL em campos nao editados.
+    const fields=[
+      ['alunoNome','gAlunoNome',a.aluno||''],
+      ['duracaoFinanceiraMeses','gDuracaoFinanceira',a.duracaoFinanceiraMeses||''],
+      ['duracaoPedagogicaMeses','gDuracaoPedagogica',a.duracaoPedagogicaFonte==='manual'?(a.duracaoPedagogicaMeses||''):''],
+      ['dataInicioPedagogica','gInicioPedagogico',a.dataInicioPedagogica||''],
+      ['dataInicioFinanceira','gInicioFinanceiro',a.dataInicioFinanceira||''],
+      ['dataUltimaParcelaFinanceira','gUltimaParcelaFinanceiro',a.dataUltimaParcelaFinanceira||''],
+      ['ultimoPagamentoManual','gUltimoPagamentoManual',a.ultimoPagamentoManual||''],
+      ['financeiroStatus','gFinanceiro',a.financeiroStatus||'nao_informado'],
+      ['mesesInadimplencia','gMeses',Number(a.mesesInadimplencia)||0],
+      ['financeiroObservacoes','gObs',a.financeiroObservacoes||'']
+    ];
+    for(const [key,id,original] of fields){
+      const value=document.getElementById(id).value;
+      if(String(value)!==String(original)) d[key]=value;
+    }
+    if(Object.keys(d).length===1){toast('Nenhuma alteração para salvar.');return;}
     await api('salvar_gestao_matricula',d);toast('Gestão da matrícula atualizada.');closeModal();setTimeout(openRadarGestao,80);
   }
   async function bloquearFinanceiro(matriculaId){

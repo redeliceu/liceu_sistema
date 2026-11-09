@@ -854,7 +854,9 @@ function initVisitas(PDO $pdo): void {
         'primeira_mensalidade_status' => "VARCHAR(24) NOT NULL DEFAULT 'aguardando'",
         'primeira_mensalidade_pago_em' => "VARCHAR(10) NULL",
         'primeira_mensalidade_atualizado_por' => "INTEGER NULL",
-        'primeira_mensalidade_atualizado_em' => "DATETIME NULL"
+        'primeira_mensalidade_atualizado_em' => "DATETIME NULL",
+        'comissao_enviada_em' => "DATETIME NULL",
+        'comissao_enviada_por' => "INTEGER NULL"
     ] as $col => $def) {
         if (!colunaExiste($pdo, 'controle_qualidade_contratos', $col)) {
             $pdo->exec("ALTER TABLE controle_qualidade_contratos ADD COLUMN {$col} {$def}");
@@ -1191,7 +1193,7 @@ authInit($pdo);
     if (!$__arenaAction && !authLogged()) out(['ok'=>false,'error'=>'Sessão expirada.'],401);
     $__vPdo=db();
     if (!$__arenaAction && !authPermission($__vPdo,'app.visitas')) out(['ok'=>false,'error'=>'Sem acesso ao aplicativo Visitas.'],403);
-    if (!$__arenaAction && authRole()==='financeiro' && !in_array($action,['auth_status','state','cq_painel','cq_salvar','cq_informar_taxa','comissao_primeira_mensalidade'],true)) out(['ok'=>false,'error'=>'Financeiro/Cobrança possui acesso somente ao Controle de Qualidade.'],403);
+    if (!$__arenaAction && authRole()==='financeiro' && !in_array($action,['auth_status','state','cq_painel','cq_salvar','cq_informar_taxa','cq_marcar_comissao','comissao_primeira_mensalidade','cq_exportar_comissao'],true)) out(['ok'=>false,'error'=>'Financeiro/Cobrança possui acesso somente ao Controle de Qualidade.'],403);
     // V54.14: Pedagógico com visitas.consultar tem leitura real do módulo.
     // Mantém escrita bloqueada, mas não depende de lista de perfis para validar consulta.
     if (!$__arenaAction && authPermission($__vPdo,'visitas.consultar') && !authPermission($__vPdo,'visitas.operar')
@@ -4697,7 +4699,7 @@ authInit($pdo);
         $acr=$ac->fetch()?:[];
 
         // Contratos do próprio vendedor.
-        $stmt=$pdo->prepare("SELECT v.id visita_id,v.data,v.nome,v.telefone,v.protocolo,COALESCE(cq.status,'nao_revisado') cq_status,cq.checklist_json,cq.observacoes cq_observacoes,cq.atualizado_em cq_atualizado_em,COALESCE(cq.financeiro_status,'pendente') financeiro_status,COALESCE(cq.financeiro_observacoes,'') financeiro_observacoes,cq.financeiro_atualizado_em,COALESCE(cq.primeira_mensalidade_status,'aguardando') primeira_mensalidade_status,cq.primeira_mensalidade_pago_em,(SELECT COUNT(*) FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda')+(SELECT COUNT(*) FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.status='pendente_alocacao' AND vp.tipo_ingresso='venda') qtd_contratos,(SELECT COUNT(*) FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda' AND COALESCE(vm.taxa_status,'pendente')='pendente')+(SELECT COUNT(*) FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.status='pendente_alocacao' AND vp.tipo_ingresso='venda' AND COALESCE(vp.taxa_status,'pendente')='pendente') taxas_pendentes,COALESCE(
+        $stmt=$pdo->prepare("SELECT v.id visita_id,v.data,v.nome,v.telefone,v.protocolo,COALESCE(cq.status,'nao_revisado') cq_status,cq.checklist_json,cq.observacoes cq_observacoes,cq.atualizado_em cq_atualizado_em,COALESCE(cq.financeiro_status,'pendente') financeiro_status,COALESCE(cq.financeiro_observacoes,'') financeiro_observacoes,cq.financeiro_atualizado_em,COALESCE(cq.primeira_mensalidade_status,'aguardando') primeira_mensalidade_status,cq.primeira_mensalidade_pago_em,cq.comissao_enviada_em,cq.comissao_enviada_por,(SELECT COUNT(*) FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda')+(SELECT COUNT(*) FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.status='pendente_alocacao' AND vp.tipo_ingresso='venda') qtd_contratos,(SELECT COUNT(*) FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda' AND COALESCE(vm.taxa_status,'pendente')='pendente')+(SELECT COUNT(*) FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.status='pendente_alocacao' AND vp.tipo_ingresso='venda' AND COALESCE(vp.taxa_status,'pendente')='pendente') taxas_pendentes,COALESCE(
                          LEAST(
                            NULLIF((SELECT MIN(vm.taxa_vencimento) FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda' AND COALESCE(vm.taxa_status,'pendente')='pendente' AND vm.taxa_vencimento IS NOT NULL AND vm.taxa_vencimento<>''),''),
                            NULLIF((SELECT MIN(vp.taxa_vencimento) FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.status='pendente_alocacao' AND vp.tipo_ingresso='venda' AND COALESCE(vp.taxa_status,'pendente')='pendente' AND vp.taxa_vencimento IS NOT NULL AND vp.taxa_vencimento<>''),'')
@@ -5927,6 +5929,145 @@ authInit($pdo);
         }
     }
 
+    // Exportação administrativa: somente aprovados, taxa e primeira mensalidade pagas,
+    // ainda não enviados à comissão. Não marca o envio automaticamente.
+    if ($action === 'cq_exportar_comissao') {
+        exigirOperadorVisitas();
+        $inicio=trim((string)($_GET['inicio']??''));
+        $fim=trim((string)($_GET['fim']??''));
+        // Compatibilidade com chamadas antigas que enviam apenas o mes.
+        $mes=trim((string)($_GET['mes']??''));
+        if($mes!=='' && !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/',$mes)) out(['ok'=>false,'error'=>'Mês inválido.'],422);
+        if($mes!=='' && $inicio==='' && $fim===''){
+            $inicio=$mes.'-01';
+            $fim=date('Y-m-t',strtotime($inicio));
+        }
+        foreach([$inicio,$fim] as $dataFiltro){
+            if($dataFiltro!=='' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$dataFiltro) || date('Y-m-d',strtotime($dataFiltro))!==$dataFiltro))
+                out(['ok'=>false,'error'=>'Data inválida. Use AAAA-MM-DD.'],422);
+        }
+        if($inicio!=='' && $fim!=='' && $inicio>$fim) out(['ok'=>false,'error'=>'Data inicial posterior à final.'],422);
+        // Nao depende de presenca, turma ou inicio das aulas. Contratos ainda nao
+        // alocados sao incluidos pela segunda consulta, sem duplicar os alocados.
+        $sql="SELECT v.data data_matricula, v.id visita_id, a.nome aluno,
+                     COALESCE(t.nome,'') curso, vm.duracao_contrato duracao,
+                     vm.taxa_matricula taxa, vm.taxa_pago_em taxa_pago_em,
+                     COALESCE(pf.valor_pontualidade, vm.valor_pontualidade) mensalidade, vend.nome vendedor,
+                     cq.primeira_mensalidade_pago_em primeira_pago_em, cq.status status_cq,
+                     (SELECT MIN(c.data_aula)
+                        FROM chamadas c JOIN presencas p ON p.chamada_id=c.id AND p.aluno_id=vm.aluno_id AND p.presente=1
+                        JOIN matriculas m2 ON m2.id=vm.matricula_id AND m2.turma_id=c.turma_id) primeira_aula
+                FROM visita_matriculas vm
+                JOIN visitas v ON v.id=vm.visita_id
+                JOIN alunos a ON a.id=vm.aluno_id
+                LEFT JOIN matriculas m ON m.id=vm.matricula_id
+                LEFT JOIN turmas t ON t.id=m.turma_id
+                LEFT JOIN planos_financeiros_v2 pf ON pf.id=COALESCE(vm.plano_financeiro_v2_id,vm.plano_financeiro_id)
+                LEFT JOIN vendedores vend ON vend.id=COALESCE(vm.vendedor_id,v.vendedor_id)
+                JOIN controle_qualidade_contratos cq ON cq.visita_id=v.id
+                WHERE vm.tipo_ingresso='venda' AND vm.taxa_status='paga'
+                  
+                  AND cq.primeira_mensalidade_status='pago'
+                  AND cq.comissao_enviada_em IS NULL
+                  AND (:inicio1='' OR DATE(v.data)>=:inicio2)
+                  AND (:fim1='' OR DATE(v.data)<=:fim2)
+                UNION ALL
+                SELECT v.data, v.id, a.nome, vp.curso_nome, vp.duracao_contrato,
+                       vp.taxa_matricula, vp.taxa_pago_em, COALESCE(pfp.valor_pontualidade, vp.valor_pontualidade), vend.nome,
+                       cq.primeira_mensalidade_pago_em, cq.status, NULL
+                FROM visita_matriculas_pendentes vp
+                JOIN visitas v ON v.id=vp.visita_id
+                JOIN alunos a ON a.id=vp.aluno_id
+                LEFT JOIN planos_financeiros_v2 pfp ON pfp.id=COALESCE(vp.plano_financeiro_v2_id,vp.plano_financeiro_id)
+                LEFT JOIN vendedores vend ON vend.id=COALESCE(vp.vendedor_id,v.vendedor_id)
+                JOIN controle_qualidade_contratos cq ON cq.visita_id=v.id
+                WHERE vp.tipo_ingresso='venda' 
+                  AND vp.taxa_status='paga'
+                  
+                  AND cq.primeira_mensalidade_status='pago'
+                  AND cq.comissao_enviada_em IS NULL
+                  AND (:inicio3='' OR DATE(v.data)>=:inicio4)
+                  AND (:fim3='' OR DATE(v.data)<=:fim4)
+                ORDER BY data_matricula,aluno,curso";
+        $stmt=$pdo->prepare($sql);
+        $stmt->execute(['inicio1'=>$inicio,'inicio2'=>$inicio,'fim1'=>$fim,'fim2'=>$fim,
+                        'inicio3'=>$inicio,'inicio4'=>$inicio,'fim3'=>$fim,'fim4'=>$fim]);
+        $dados=$stmt->fetchAll(PDO::FETCH_ASSOC);
+        $headers=['Data Matrícula','Nº Matrícula','Aluno','Curso','Quantidade de parcelas','Duração Curso',
+                  'Valor Taxa','Data pagamento Taxa','Status Taxa','Valor mensalidade',
+                  'Data pagamento mensalidade','Status Mensalidade','Vendedora',
+                  'Contrato válido','Presença 1ª Aula','Taxa + Mensalidade'];
+        $rows=[$headers];
+        foreach($dados as $r){
+            $taxa=(float)($r['taxa']??0);$mens=isset($r['mensalidade'])?(float)$r['mensalidade']:null;
+            $somenteData=static function($v):string { $v=trim((string)($v??''));return $v===''?'':substr($v,0,10); };
+            $rows[]=[$somenteData($r['data_matricula']),'',(string)$r['aluno'],(string)$r['curso'],
+                     (int)($r['duracao']??0),(int)($r['duracao']??0),$taxa,
+                     $somenteData($r['taxa_pago_em']??''),'Paga',$mens??'',
+                     $somenteData($r['primeira_pago_em']??''),'Paga',(string)($r['vendedor']??''),
+                     (string)($r['status_cq']??'Pendente'),$somenteData($r['primeira_aula']??''),$mens===null?'':$taxa+$mens];
+        }
+        $esc=static fn($v)=>htmlspecialchars((string)$v,ENT_XML1|ENT_QUOTES,'UTF-8');
+        $col=static function(int $i):string{$out='';for($i++;$i>0;$i=intdiv($i-1,26))$out=chr(65+($i-1)%26).$out;return $out;};
+        $xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"/></sheetViews>'
+            .'<sheetFormatPr defaultRowHeight="18"/><cols><col min="1" max="2" width="17" customWidth="1"/>'
+            .'<col min="3" max="4" width="34" customWidth="1"/><col min="5" max="16" width="22" customWidth="1"/></cols><sheetData>';
+        foreach($rows as $ri=>$row){
+            $num=$ri+1;$xml.='<row r="'.$num.'">';
+            foreach($row as $ci=>$val){
+                $cell=$col($ci).$num;
+                if($ri>0 && in_array($ci,[4,5,6,9,15],true) && is_numeric($val)){
+                    $xml.='<c r="'.$cell.'" t="n"><v>'.(float)$val.'</v></c>';
+                }else{
+                    $xml.='<c r="'.$cell.'" t="inlineStr"><is><t>'.$esc($val).'</t></is></c>';
+                }
+            }
+            $xml.='</row>';
+        }
+        $xml.='</sheetData><autoFilter ref="A1:P'.count($rows).'"/></worksheet>';
+        $tmp=tempnam(sys_get_temp_dir(),'liceu_cq_');
+        // XLSX e um pacote ZIP. Gerador nativo sem dependencia de ext-zip.
+        $zipFiles=[];
+        $zipFiles['[Content_Types].xml'] ='<?xml version="1.0" encoding="UTF-8"?>'
+          .'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+          .'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+          .'<Default Extension="xml" ContentType="application/xml"/>'
+          .'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+          .'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>';
+        $zipFiles['_rels/.rels'] ='<?xml version="1.0" encoding="UTF-8"?>'
+          .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+          .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+        $zipFiles['xl/workbook.xml'] ='<?xml version="1.0" encoding="UTF-8"?>'
+          .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+          .'<sheets><sheet name="Comissionamento" sheetId="1" r:id="rId1"/></sheets></workbook>';
+        $zipFiles['xl/_rels/workbook.xml.rels'] ='<?xml version="1.0" encoding="UTF-8"?>'
+          .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+          .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>';
+        $zipFiles['xl/worksheets/sheet1.xml'] =$xml;
+        // ZIP armazenado (metodo 0): compativel com Excel, sem ZipArchive ou zlib.
+        $fh=fopen($tmp,'wb');
+        if(!$fh) out(['ok'=>false,'error'=>'Falha ao criar arquivo temporario.'],500);
+        $central='';$offset=0;$entries=0;
+        foreach($zipFiles as $name=>$content){
+            $name=(string)$name;$content=(string)$content;
+            $size=strlen($content);$crc=crc32($content);
+            $local=pack('VvvvvvVVVvv',0x04034b50,20,0,0,0,0,$crc,$size,$size,strlen($name),0);
+            fwrite($fh,$local.$name.$content);
+            $central.=pack('VvvvvvvVVVvvvvvVV',0x02014b50,20,20,0,0,0,0,$crc,$size,$size,strlen($name),0,0,0,0,0,$offset).$name;
+            $offset+=strlen($local)+strlen($name)+$size;$entries++;
+        }
+        fwrite($fh,$central);
+        fwrite($fh,pack('VvvvvVVv',0x06054b50,0,0,$entries,$entries,strlen($central),$offset,0));
+        fclose($fh);
+
+        header_remove('Content-Type');
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="comissionamento-pendente-'.($inicio?:'inicio').'-'.($fim?:'fim').'.xlsx"');
+        header('Content-Length: '.filesize($tmp));
+        readfile($tmp);unlink($tmp);exit;
+    }
+
     if ($action === 'cq_painel') {
         exigirOperadorVisitas();
         $stmt=$pdo->query("SELECT v.id visita_id,v.data,v.nome,v.protocolo,vend.nome vendedor_nome,cq.status cq_status,cq.checklist_json,cq.observacoes cq_observacoes,cq.atualizado_em cq_atualizado_em,COALESCE(cq.financeiro_status,'pendente') financeiro_status,COALESCE(cq.financeiro_observacoes,'') financeiro_observacoes,cq.financeiro_atualizado_em,COALESCE(cq.primeira_mensalidade_status,'aguardando') primeira_mensalidade_status,cq.primeira_mensalidade_pago_em,
@@ -5939,6 +6080,8 @@ authInit($pdo);
              JOIN chamadas c ON c.turma_id=m.turma_id
              JOIN presencas p ON p.chamada_id=c.id AND p.aluno_id=vm.aluno_id AND p.presente=1
             WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda') primeira_presenca,
+          (SELECT COUNT(*) FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda' AND vm.taxa_status='paga')+(SELECT COUNT(*) FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.status='pendente_alocacao' AND vp.tipo_ingresso='venda' AND vp.taxa_status='paga') taxas_pagas,
+          (SELECT COUNT(*) FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda' AND vm.taxa_status='isenta')+(SELECT COUNT(*) FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.status='pendente_alocacao' AND vp.tipo_ingresso='venda' AND vp.taxa_status='isenta') taxas_isentas,
           (SELECT COUNT(*) FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda' AND COALESCE(vm.taxa_status,'pendente')='pendente')+(SELECT COUNT(*) FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.status='pendente_alocacao' AND vp.tipo_ingresso='venda' AND COALESCE(vp.taxa_status,'pendente')='pendente') taxas_pendentes,
           NULLIF(LEAST(
               COALESCE((SELECT MIN(NULLIF(vm.taxa_vencimento,'')) FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda' AND COALESCE(vm.taxa_status,'pendente')='pendente'),'9999-12-31'),
@@ -5947,10 +6090,24 @@ authInit($pdo);
           FROM visitas v LEFT JOIN vendedores vend ON vend.id=v.vendedor_id LEFT JOIN controle_qualidade_contratos cq ON cq.visita_id=v.id
           WHERE EXISTS(SELECT 1 FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda') OR EXISTS(SELECT 1 FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.status='pendente_alocacao' AND vp.tipo_ingresso='venda') ORDER BY v.data DESC,v.id DESC");
         $itens=[];$hoje=date('Y-m-d');
-        foreach($stmt->fetchAll() as $r){$check=json_decode((string)($r['checklist_json']??'{}'),true);if(!is_array($check))$check=[];$campos=['dados_contrato','assinaturas','documentos_pessoais','comprovante_residencia','pagamento_anexado'];$pendDocs=0;foreach($campos as $c)if(empty($check[$c]))$pendDocs++;$venc=(string)($r['proximo_vencimento']??'');$itens[]=['visitaId'=>(int)$r['visita_id'],'data'=>(string)$r['data'],'nome'=>(string)$r['nome'],'protocolo'=>(string)($r['protocolo']??''),'vendedor'=>(string)($r['vendedor_nome']??''),'status'=>(string)($r['cq_status']??'nao_revisado'),'checklist'=>$check,'observacoes'=>(string)($r['cq_observacoes']??''),'atualizadoEm'=>$r['cq_atualizado_em']??null,'contratos'=>(int)$r['qtd_contratos'],'taxasPendentes'=>(int)$r['taxas_pendentes'],'proximoVencimento'=>$venc!==''?$venc:null,'taxaAtrasada'=>((int)$r['taxas_pendentes']>0&&$venc!==''&&$venc<$hoje),'documentosPendentes'=>$pendDocs,'financeiroStatus'=>(string)($r['financeiro_status']??'pendente'),'financeiroObservacoes'=>(string)($r['financeiro_observacoes']??''),'financeiroAtualizadoEm'=>$r['financeiro_atualizado_em']??null,'primeiraMensalidadeStatus'=>(string)($r['primeira_mensalidade_status']??'aguardando'),'primeiraMensalidadePagoEm'=>$r['primeira_mensalidade_pago_em']??null,'inicioStatus'=>!empty($r['primeira_presenca'])?'iniciou':(((int)($r['qtd_alocadas']??0)===0&&(int)($r['qtd_aguardando_alocacao']??0)>0)?'aguardando_alocacao':'nao_iniciou'),'primeiraPresenca'=>!empty($r['primeira_presenca'])?(string)$r['primeira_presenca']:null];}
+        foreach($stmt->fetchAll() as $r){$check=json_decode((string)($r['checklist_json']??'{}'),true);if(!is_array($check))$check=[];$campos=['dados_contrato','assinaturas','documentos_pessoais','comprovante_residencia','pagamento_anexado'];$pendDocs=0;foreach($campos as $c)if(empty($check[$c]))$pendDocs++;$venc=(string)($r['proximo_vencimento']??'');$itens[]=['visitaId'=>(int)$r['visita_id'],'data'=>(string)$r['data'],'nome'=>(string)$r['nome'],'protocolo'=>(string)($r['protocolo']??''),'vendedor'=>(string)($r['vendedor_nome']??''),'status'=>(string)($r['cq_status']??'nao_revisado'),'checklist'=>$check,'observacoes'=>(string)($r['cq_observacoes']??''),'atualizadoEm'=>$r['cq_atualizado_em']??null,'contratos'=>(int)$r['qtd_contratos'],'taxasPagas'=>(int)$r['taxas_pagas'],'taxasIsentas'=>(int)$r['taxas_isentas'],'taxasPendentes'=>(int)$r['taxas_pendentes'],'proximoVencimento'=>$venc!==''?$venc:null,'taxaAtrasada'=>((int)$r['taxas_pendentes']>0&&$venc!==''&&$venc<$hoje),'documentosPendentes'=>$pendDocs,'financeiroStatus'=>(string)($r['financeiro_status']??'pendente'),'financeiroObservacoes'=>(string)($r['financeiro_observacoes']??''),'financeiroAtualizadoEm'=>$r['financeiro_atualizado_em']??null,'primeiraMensalidadeStatus'=>(string)($r['primeira_mensalidade_status']??'aguardando'),'primeiraMensalidadePagoEm'=>$r['primeira_mensalidade_pago_em']??null,'comissaoEnviadaEm'=>$r['comissao_enviada_em']??null,'comissaoEnviadaPor'=>$r['comissao_enviada_por']??null,'inicioStatus'=>!empty($r['primeira_presenca'])?'iniciou':(((int)($r['qtd_alocadas']??0)===0&&(int)($r['qtd_aguardando_alocacao']??0)>0)?'aguardando_alocacao':'nao_iniciou'),'primeiraPresenca'=>!empty($r['primeira_presenca'])?(string)$r['primeira_presenca']:null];}
         out(['ok'=>true,'itens'=>$itens]);
     }
 
+
+    if ($action === 'cq_marcar_comissao') {
+        exigirOperadorVisitas();
+        $visitaId=(int)($d['visitaId']??0);
+        $enviada=($d['enviada']??null);
+        if($visitaId<=0 || !is_bool($enviada)) out(['ok'=>false,'error'=>'Informe uma visita e um estado válido.'],422);
+        $check=$pdo->prepare("SELECT 1 FROM visitas v WHERE v.id=? AND (EXISTS(SELECT 1 FROM visita_matriculas vm WHERE vm.visita_id=v.id AND vm.tipo_ingresso='venda') OR EXISTS(SELECT 1 FROM visita_matriculas_pendentes vp WHERE vp.visita_id=v.id AND vp.tipo_ingresso='venda' AND vp.status='pendente_alocacao'))");
+        $check->execute([$visitaId]);
+        if(!$check->fetchColumn()) out(['ok'=>false,'error'=>'Matrícula paga não localizada para esta visita.'],404);
+        // Este marcador registra somente o envio administrativo à comissão; não altera a elegibilidade ou o cálculo da comissão.
+        $q=$pdo->prepare("INSERT INTO controle_qualidade_contratos(visita_id,status,checklist_json,observacoes,comissao_enviada_em,comissao_enviada_por) VALUES(?,'nao_revisado','{}','',?,?) ON DUPLICATE KEY UPDATE comissao_enviada_em=VALUES(comissao_enviada_em),comissao_enviada_por=VALUES(comissao_enviada_por)");
+        $q->execute([$visitaId,$enviada?date('Y-m-d H:i:s'):null,$enviada?authUserId():null]);
+        out(['ok'=>true,'message'=>$enviada?'Marcado como enviado à comissão.':'Envio à comissão desmarcado.']);
+    }
 
     if ($action === 'cq_informar_taxa') {
         exigirOperadorVisitas();
