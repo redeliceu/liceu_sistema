@@ -16,6 +16,7 @@ $apps=[
  ['slug'=>'mapa','titulo'=>'Mapa','desc'=>'Alunos, turmas, pedagógico, Radar e acompanhamento.','url'=>'mapa/','icon'=>'▦','perm'=>'app.mapa'],
  ['slug'=>'visitas','titulo'=>'Visitas','desc'=>'Visitas, recepção e Controle de Qualidade conforme seu perfil.','url'=>'visitas/','icon'=>'◎','perm'=>'app.visitas'],
  ['slug'=>'cobranca','titulo'=>'Cobrança','desc'=>'Cobranças, contatos, follow-ups, promessas e acordos.','url'=>'cobranca/','icon'=>'R$','perm'=>'app.cobranca'],
+ ['slug'=>'relatorios','titulo'=>'Relatórios Integrados','desc'=>'Visão diária do comercial, pedagógico, financeiro e cobranças.','url'=>'relatorios/','icon'=>'▤','perm'=>'app.analytics'],
  ['slug'=>'analytics','titulo'=>'Analytics','desc'=>'Indicadores gerenciais e análises do Liceu.','url'=>'analytics/','icon'=>'↗','perm'=>'app.analytics'],
  ['slug'=>'professor','titulo'=>'Professor','desc'=>'Minhas turmas e chamadas.','url'=>'professor/','icon'=>'✓','perm'=>'app.professor'],
  ['slug'=>'admin','titulo'=>'Administração','desc'=>'Usuários, perfis, permissões e exceções individuais.','url'=>'admin/','icon'=>'⚙','perm'=>'sistema.usuarios'],
